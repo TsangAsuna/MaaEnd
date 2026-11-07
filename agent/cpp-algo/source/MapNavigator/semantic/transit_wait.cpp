@@ -28,7 +28,7 @@ size_t find_future_zone_declaration(const Context& ctx, const std::string& zone_
     const std::vector<Waypoint>& path = ctx.session->currentPath();
     for (size_t index = ctx.session->currentNodeIdx(); index < path.size(); ++index) {
         const Waypoint& waypoint = path[index];
-        if (waypoint.isZoneDeclaration() && !waypoint.zone_id.empty() && waypoint.zone_id == zone_id) {
+        if (IsZoneDeclaration(waypoint) && !waypoint.zone_id.empty() && waypoint.zone_id == zone_id) {
             return index;
         }
     }

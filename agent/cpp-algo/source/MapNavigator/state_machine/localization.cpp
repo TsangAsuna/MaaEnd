@@ -400,7 +400,7 @@ bool NavigationStateMachine::planCrossTierEscapeCorridorFromHere(const char* rea
     for (size_t index = session_->currentNodeIdx(); index < path.size(); ++index) {
         // 必须拷贝, 叠加成功会重建 current_path_
         const Waypoint candidate = session_->currentPathAt(index);
-        if (!candidate.hasPosition()) {
+        if (!candidate.has_position) {
             continue;
         }
         const std::optional<size_t> continue_index = session_->canonicalIndexAtCurrentPath(index);

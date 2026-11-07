@@ -543,7 +543,7 @@ void append_expanded_waypoints(
     std::vector<Waypoint>& out_waypoints)
 {
     const auto append = [&](ActionType action) {
-        Waypoint waypoint(position.at(0), position.at(1), action);
+        Waypoint waypoint { .x = position.at(0), .y = position.at(1), .action = action };
         waypoint.zone_id = zone_id;
         waypoint.target_tier = input.target_tier_;
         waypoint.strict_arrival = input.strict_arrival_;
@@ -742,7 +742,7 @@ bool append_zone(const std::string& zone_id, std::vector<Waypoint>& out_waypoint
     if (zone_id.empty()) {
         return false;
     }
-    out_waypoints.push_back(Waypoint::zone(zone_id));
+    out_waypoints.push_back(ZoneWaypoint(zone_id));
     zone_context = zone_id;
     return true;
 }
@@ -750,7 +750,7 @@ bool append_zone(const std::string& zone_id, std::vector<Waypoint>& out_waypoint
 bool append_heading(const NaviWaypointInput& input, const std::string& zone_id, std::vector<Waypoint>& out_waypoints)
 {
     if (input.target_) {
-        Waypoint heading_waypoint = Waypoint::headingToTarget(input.target_->at(0), input.target_->at(1));
+        Waypoint heading_waypoint = HeadingToTargetWaypoint(input.target_->at(0), input.target_->at(1));
         heading_waypoint.zone_id = zone_id;
         heading_waypoint.target_tier = input.target_tier_;
         heading_waypoint.route_required = input.required_;
@@ -760,7 +760,7 @@ bool append_heading(const NaviWaypointInput& input, const std::string& zone_id, 
     if (!input.angle_) {
         return false;
     }
-    Waypoint heading_waypoint = Waypoint::heading(*input.angle_);
+    Waypoint heading_waypoint = HeadingWaypoint(*input.angle_);
     heading_waypoint.zone_id = zone_id;
     heading_waypoint.route_required = input.required_;
     out_waypoints.push_back(std::move(heading_waypoint));
@@ -772,7 +772,7 @@ bool append_navmesh(const NaviWaypointInput& input, const std::string& zone_id, 
     if (!input.target_) {
         return false;
     }
-    Waypoint navmesh_waypoint(input.target_->at(0), input.target_->at(1), ActionType::NAVMESH);
+    Waypoint navmesh_waypoint { .x = input.target_->at(0), .y = input.target_->at(1), .action = ActionType::NAVMESH };
     // 规划腿一律按严判收尾, 与作者是否写 strict_arrival 无关
     navmesh_waypoint.strict_arrival = true;
     navmesh_waypoint.zone_id = zone_id;
@@ -793,7 +793,7 @@ bool append_find(
 {
     Waypoint find_waypoint;
     if (const std::optional<std::array<double, 2>> position = authored_position(input)) {
-        find_waypoint = Waypoint(position->at(0), position->at(1), ActionType::FIND);
+        find_waypoint = Waypoint { .x = position->at(0), .y = position->at(1), .action = ActionType::FIND };
         find_waypoint.target_tier = input.target_tier_;
         find_waypoint.target_deck_y = input.target_deck_y_;
         find_waypoint.strict_arrival = input.strict_arrival_;
@@ -833,7 +833,7 @@ bool append_positioned(
     if (!input.angle_) {
         return false;
     }
-    Waypoint heading_waypoint = Waypoint::heading(*input.angle_);
+    Waypoint heading_waypoint = HeadingWaypoint(*input.angle_);
     heading_waypoint.zone_id = zone_id;
     out_waypoints.push_back(std::move(heading_waypoint));
     return true;

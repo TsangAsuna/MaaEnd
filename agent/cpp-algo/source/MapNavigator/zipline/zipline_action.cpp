@@ -187,7 +187,7 @@ private:
 
 size_t skip_continuous_run(const std::vector<Waypoint>& path, size_t index)
 {
-    while (index < path.size() && path[index].isContinuousRun()) {
+    while (index < path.size() && IsContinuousRun(path[index])) {
         ++index;
     }
     return index;

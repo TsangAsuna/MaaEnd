@@ -31,10 +31,10 @@ std::optional<DynamicAnchor> resolve_nav_run_anchor(NavigationSession* session, 
         return std::nullopt;
     }
     const Waypoint& current_waypoint = session->currentWaypoint();
-    if (!current_waypoint.hasPosition() || current_waypoint.action != ActionType::RUN) {
+    if (!current_waypoint.has_position || current_waypoint.action != ActionType::RUN) {
         return std::nullopt;
     }
-    if (current_waypoint.requiresStrictArrival()) {
+    if (RequiresStrictArrival(current_waypoint)) {
         return DynamicAnchor { session->canonicalIndexAtCurrent().value_or(kUnaddressableAnchorIndex), current_waypoint };
     }
     return ResolveCurrentAnchor(session, position);
@@ -118,7 +118,7 @@ void NavigationStateMachine::consumeCorridorPassedWaypoints(NavigateTick& tick)
 {
     size_t consumed = 0;
     while (consumed < tick.nav_run_result.passed_run_waypoints && session_->hasCurrentWaypoint()
-           && session_->currentWaypoint().isContinuousRun()) {
+           && IsContinuousRun(session_->currentWaypoint())) {
         session_->advanceToNextWaypoint(ActionType::RUN, "navmesh_corridor_passed_run_waypoint");
         ++consumed;
     }
@@ -205,9 +205,9 @@ double NavigationStateMachine::resolveArrivalDistance(const NavigateTick& tick)
 {
     const Waypoint& waypoint = tick.waypoint;
     const RouteMeasurement& route = tick.route;
-    double arrival_distance = std::max(route.arrival_band, waypoint.traits().commit_distance);
-    if (waypoint.stopsOnPromptDetection() && session_->hardStalledMs(tick.now) > kCollectArrivalRelaxMs) {
-        const double relaxed = waypoint.arrivalBand(kMeasurementDefaultPositionQuantum, /*relax_tight_band=*/true);
+    double arrival_distance = std::max(route.arrival_band, TraitsOf(waypoint.action).commit_distance);
+    if (StopsOnPromptDetection(waypoint) && session_->hardStalledMs(tick.now) > kCollectArrivalRelaxMs) {
+        const double relaxed = UntightenedArrivalBand(waypoint, kMeasurementDefaultPositionQuantum);
         if (relaxed > arrival_distance && route.waypoint_distance <= relaxed) {
             LogInfo << "Prompt-point arrival band relaxed after no progress."
                     << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx()) << VAR(route.waypoint_distance)
@@ -222,7 +222,7 @@ double NavigationStateMachine::resolveArrivalDistance(const NavigateTick& tick)
             arrival_distance = std::min(arrival_distance, kZiplineRestandBandWu);
         }
     }
-    if (waypoint.isAsyncInteract() && runtime_state_.interact_approach.promptMissedAt(session_->currentAbsoluteNodeIndex())
+    if (IsAsyncInteract(waypoint) && runtime_state_.interact_approach.promptMissedAt(session_->currentAbsoluteNodeIndex())
         && tick.now - runtime_state_.interact_approach.missed_at <= std::chrono::milliseconds(kCollectArrivalRelaxMs)) {
         arrival_distance = std::min(arrival_distance, kStrictSettleAcceptBandWu);
     }
@@ -257,7 +257,7 @@ TickStep NavigationStateMachine::settleAtArrival(const NavigateTick& tick)
 {
     const RouteMeasurement& route = tick.route;
     const Waypoint& waypoint = tick.waypoint;
-    if (!waypoint.settlesAtArrival()) {
+    if (!SettlesAtArrival(waypoint)) {
         return TickStep::Next;
     }
     if (route.waypoint_distance <= route.arrival_band) {
@@ -309,16 +309,16 @@ TickStep NavigationStateMachine::passArrivedWaypoints(NavigateTick& tick)
                 0.0,
                 tick.stalled_ms));
         }
-        if (!tick.fix.drops_turn_sends || !waypoint.isContinuousRun() || session_->phase() != NaviPhase::Navigate
+        if (!tick.fix.drops_turn_sends || !IsContinuousRun(waypoint) || session_->phase() != NaviPhase::Navigate
             || !session_->hasCurrentWaypoint()) {
             return TickStep::EndTick;
         }
         route = RouteTracker::update(session_, &runtime_state_.route, *position_);
         waypoint = session_->currentWaypoint();
-        if (!route.valid || !waypoint.isContinuousRun() || waypoint.drop_from) {
+        if (!route.valid || !IsContinuousRun(waypoint) || waypoint.drop_from) {
             return TickStep::EndTick;
         }
-        arrival_distance = std::max(route.arrival_band, waypoint.traits().commit_distance);
+        arrival_distance = std::max(route.arrival_band, TraitsOf(waypoint.action).commit_distance);
     } while (route.waypoint_distance <= arrival_distance && route.startup_motion_confirmed);
     LogDebug << "Passed corridor waypoints; steering on this fix." << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx())
              << VAR(route.waypoint_distance) << VAR(arrival_distance);

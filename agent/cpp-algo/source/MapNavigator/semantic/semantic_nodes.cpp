@@ -106,7 +106,7 @@ Result arrive_async_interact(const Context& ctx, const Waypoint& waypoint, const
     LogInfo << "Action: INTERACT reached, running the authoritative recognition." << VAR(actual_distance)
             << VAR(waypoint.interact_text.size()) << VAR(waypoint.interact_scan) << VAR(waypoint.interact_rec);
     const bool recognized = RunPromptSubtask(ctx.maa_context, kInteractPromptSpec, &waypoint.interact_text, waypoint.interact_rec);
-    if (!recognized && waypoint.hasPosition() && node_idx && !ctx.runtime_state->interact_approach.promptMissedAt(node_idx)
+    if (!recognized && waypoint.has_position && node_idx && !ctx.runtime_state->interact_approach.promptMissedAt(node_idx)
         && actual_distance > kStrictSettleAcceptBandWu) {
         return walk_on_after_prompt_miss(ctx, node_idx, actual_distance);
     }
@@ -135,7 +135,7 @@ Result arrive_key_interact(const Context& ctx, const Waypoint& waypoint, const s
         return { .consumed = true, .rope_unavailable = waypoint.rope_ride->uid };
     }
     // rec 模式到这里说明文本没解析出来, 不能按交互键
-    if (waypoint.isRecInteract()) {
+    if (IsRecInteract(waypoint)) {
         LogInfo << "Action: INTERACT in rec mode, skipping the key press." << VAR(waypoint.interact_text_node);
     }
     else {
@@ -188,7 +188,7 @@ Result ConsumeInlineSemantics(const Context& ctx)
         return find_result;
     }
 
-    if (ctx.session->hasCurrentWaypoint() && ctx.session->currentWaypoint().isZoneDeclaration()) {
+    if (ctx.session->hasCurrentWaypoint() && IsZoneDeclaration(ctx.session->currentWaypoint())) {
         ctx.motion_controller->setForwardState(true);
         return Handled();
     }
@@ -214,7 +214,7 @@ Result StartRopeRide(const Context& ctx, const RopeRideInfo& ride)
 Result HandleArrival(const Context& ctx, const Waypoint& waypoint, double actual_distance)
 {
     const std::optional<size_t> node_idx = ctx.session->currentAbsoluteNodeIndex();
-    if (waypoint.requiresStrictArrival() && ctx.motion_controller->isMoving()) {
+    if (RequiresStrictArrival(waypoint) && ctx.motion_controller->isMoving()) {
         StopMotionAndCommitment(ctx);
         SleepFor(kStopWaitMs);
     }
@@ -235,7 +235,7 @@ Result HandleArrival(const Context& ctx, const Waypoint& waypoint, double actual
     case ActionType::TRIGGER:
         return ArriveTrigger(ctx, waypoint, actual_distance);
     case ActionType::INTERACT:
-        if (waypoint.isAsyncInteract() && ctx.maa_context != nullptr) {
+        if (IsAsyncInteract(waypoint) && ctx.maa_context != nullptr) {
             return arrive_async_interact(ctx, waypoint, node_idx, actual_distance);
         }
         return arrive_key_interact(ctx, waypoint, node_idx);

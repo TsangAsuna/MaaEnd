@@ -135,7 +135,7 @@ double VerifyAndCorrectHeading(const Context& ctx, double target_heading, double
 Result ConsumeHeadingNodes(const Context& ctx)
 {
     bool consumed = false;
-    while (ctx.session->hasCurrentWaypoint() && ctx.session->currentWaypoint().isHeadingOnly()) {
+    while (ctx.session->hasCurrentWaypoint() && IsHeadingOnly(ctx.session->currentWaypoint())) {
         const Waypoint heading_node = ctx.session->currentWaypoint();
         double target_heading = 0.0;
         if (heading_node.heading_uses_target) {

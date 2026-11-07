@@ -38,7 +38,7 @@ struct CorridorProjection
 
 bool can_use_nav_run_steering(const Waypoint& waypoint)
 {
-    return waypoint.hasPosition() && waypoint.action == ActionType::RUN;
+    return waypoint.has_position && waypoint.action == ActionType::RUN;
 }
 
 std::optional<CorridorProjection> project_onto_corridor(
@@ -142,7 +142,7 @@ size_t count_corridor_passed_run_waypoints(
             break;
         }
         const Waypoint& waypoint = waypoints[index];
-        if (!waypoint.isContinuousRun()) {
+        if (!IsContinuousRun(waypoint)) {
             break;
         }
         const NaviPosition waypoint_pos { .x = waypoint.x, .y = waypoint.y };
@@ -318,7 +318,7 @@ navmesh::WorldPath build_authored_span_polyline(const NavigationSession& session
     bool any_clearance = false;
     for (size_t index = session.currentNodeIdx(); index < waypoints.size(); ++index) {
         const Waypoint& waypoint = waypoints[index];
-        if (!waypoint.hasPosition()) {
+        if (!waypoint.has_position) {
             break;
         }
         poly.points.push_back({ .x = waypoint.x, .y = waypoint.y });
@@ -354,11 +354,11 @@ bool prepend_drop_top_while_short(
     const Waypoint& top = session.currentPath()[current - 1];
     const double top_x = (*anchor.drop_from)[0];
     const double top_y = (*anchor.drop_from)[1];
-    if (!top.isContinuousRun() || top.x != top_x || top.y != top_y) {
+    if (!IsContinuousRun(top) || top.x != top_x || top.y != top_y) {
         return false;
     }
     const bool short_of_drop = (position.x - anchor.x) * (anchor.x - top_x) + (position.y - anchor.y) * (anchor.y - top_y) < 0.0;
-    if (!short_of_drop || std::hypot(position.x - top_x, position.y - top_y) > top.arrivalBand(kMeasurementDefaultPositionQuantum)) {
+    if (!short_of_drop || std::hypot(position.x - top_x, position.y - top_y) > ArrivalBand(top, kMeasurementDefaultPositionQuantum)) {
         return false;
     }
     authored.points.insert(authored.points.begin(), { .x = top_x, .y = top_y });
@@ -482,7 +482,7 @@ bool NavRunController::buildPlan(
     }
 
     // 手写裸坐标的末点直接走直线, 交给 A* 会为贴回网格绕远路
-    if (authored.points.size() == 1 && anchor.isContinuousRun() && anchor.corridor_clearance <= 0.0
+    if (authored.points.size() == 1 && IsContinuousRun(anchor) && anchor.corridor_clearance <= 0.0
         && std::hypot(position.x - anchor.x, position.y - anchor.y) > kMeasurementDefaultPositionQuantum) {
         LogDebug << "NavRunController trailing authored point kept literal." << VAR(anchor_index) << VAR(anchor.x) << VAR(anchor.y);
         return commit_authored();
@@ -668,7 +668,7 @@ NavRunTickResult NavRunController::tick(
     // 必须在下面所有提前返回之前, 走廊不可用时测速窗口也要继续积累
     recordSpeedSample(position, now);
 
-    if (!anchor.hasPosition() || !session->hasCurrentWaypoint()) {
+    if (!anchor.has_position || !session->hasCurrentWaypoint()) {
         return result;
     }
     if (!can_use_nav_run_steering(session->currentWaypoint())) {

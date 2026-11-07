@@ -38,7 +38,7 @@ Result CompleteArrival(const Context& ctx, const Waypoint& waypoint, const std::
 
 void ConsumeMatchedZoneNodes(const Context& ctx)
 {
-    while (ctx.session->hasCurrentWaypoint() && ctx.session->currentWaypoint().isZoneDeclaration()) {
+    while (ctx.session->hasCurrentWaypoint() && IsZoneDeclaration(ctx.session->currentWaypoint())) {
         const std::string& zone_id = ctx.session->currentWaypoint().zone_id;
         if (!zone_id.empty() && zone_id != ctx.session->currentZoneId()) {
             break;

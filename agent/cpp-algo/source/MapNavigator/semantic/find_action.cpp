@@ -326,7 +326,7 @@ Result ConsumeFindNodes(const Context& ctx)
 
     const Waypoint& waypoint = ctx.session->currentWaypoint();
     // 带坐标的点由 ArriveFind 接手, 这里接了会被提前吃掉
-    if (!waypoint.isFindPoint() || waypoint.hasPosition()) {
+    if (!IsFindPoint(waypoint) || waypoint.has_position) {
         return {};
     }
     return begin_find(ctx, "find_control_node_reached");
@@ -347,7 +347,7 @@ Result TickFindTarget(const Context& ctx)
     }
 
     const Waypoint& waypoint = ctx.session->currentWaypoint();
-    if (!waypoint.isFindPoint()) {
+    if (!IsFindPoint(waypoint)) {
         leave_find_phase(ctx);
         SelectPhaseForCurrentWaypoint(ctx, "find_phase_mismatch");
         return Handled();

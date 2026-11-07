@@ -44,7 +44,7 @@ Result fail_trigger(const Context& ctx, const char* reason, const char* log_mess
 
 bool IsTriggerPending(const NavigationSession& session)
 {
-    return session.hasCurrentWaypoint() && session.currentPath().back().isTriggerPoint();
+    return session.hasCurrentWaypoint() && IsTriggerPoint(session.currentPath().back());
 }
 
 Result ProbeTriggerWhileNavigating(const Context& ctx)

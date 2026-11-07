@@ -175,7 +175,7 @@ NavigationStateMachine::PromptDistance NavigationStateMachine::nearestPromptDist
     for (size_t index = session_->currentNodeIdx(); index < path.size(); ++index) {
         const Waypoint& waypoint = path[index];
         const bool is_zipline = waypoint.action == ActionType::ZIPLINE;
-        if (!waypoint.hasPosition() || (waypoint.action != ActionType::DIG && !is_zipline)
+        if (!waypoint.has_position || (waypoint.action != ActionType::DIG && !is_zipline)
             || (is_zipline && runtime_state_.isZiplineMounted())) {
             continue;
         }

@@ -39,7 +39,7 @@ bool inside_push_through_disc(const std::vector<VirtualNoGoDisc>& discs, const N
 TickStep NavigationStateMachine::checkOffRouteWedge(const NavigateTick& tick)
 {
     const RouteMeasurement& route = tick.route;
-    const bool watched = session_->phase() == NaviPhase::Navigate && tick.waypoint.isContinuousRun() && !route.on_route
+    const bool watched = session_->phase() == NaviPhase::Navigate && IsContinuousRun(tick.waypoint) && !route.on_route
                          && std::isfinite(route.cross_track) && !runtime_state_.cross_tier_escape.active;
     if (!watched) {
         runtime_state_.offroute.reset();
@@ -87,8 +87,8 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
     const RouteMeasurement& route = tick.route;
     const bool forward_hold_futile = runtime_state_.flow.futile_forward_reasserts >= kForwardHoldFutileReassertsBeforeRecovery;
     const bool pinned_without_own_fallback = forward_hold_futile && tick.stalled_ms >= kObstacleRecoveryMinTriggerMs
-                                             && !waypoint.stopsOnPromptDetection() && waypoint.action != ActionType::ZIPLINE;
-    const bool far_or_strict = tick.effective_progress > kNoProgressMinDistance || waypoint.requiresStrictArrival();
+                                             && !StopsOnPromptDetection(waypoint) && waypoint.action != ActionType::ZIPLINE;
+    const bool far_or_strict = tick.effective_progress > kNoProgressMinDistance || RequiresStrictArrival(waypoint);
     const bool should_try_recovery = session_->phase() == NaviPhase::Navigate
                                      && (tick.stalled_ms >= kObstacleRecoveryMinTriggerMs || forward_hold_futile)
                                      && (far_or_strict || pinned_without_own_fallback) && !runtime_state_.cross_tier_escape.active;

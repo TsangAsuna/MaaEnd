@@ -28,7 +28,7 @@ namespace
 
 double arrival_band_for_startup_bypass(const Waypoint& waypoint)
 {
-    return std::max(waypoint.arrivalBand(kMeasurementDefaultPositionQuantum), waypoint.traits().commit_distance);
+    return std::max(ArrivalBand(waypoint, kMeasurementDefaultPositionQuantum), TraitsOf(waypoint.action).commit_distance);
 }
 
 template <typename Plan>
@@ -50,7 +50,7 @@ bool NavigationStateMachine::tryApplyDynamicOverlayToAnchor(
     const Waypoint& anchor,
     bool emit_interior_corners)
 {
-    if (!anchor.hasPosition()) {
+    if (!anchor.has_position) {
         LogWarn << "Dynamic navmesh overlay skipped: anchor has no position." << VAR(reason) << VAR(continue_index);
         return false;
     }
@@ -80,7 +80,7 @@ bool NavigationStateMachine::tryApplyDynamicOverlayToAnchor(
 
     std::vector<Waypoint> generated_prefix;
     if (start_recovery_entry) {
-        generated_prefix.emplace_back(start_recovery_entry->x, start_recovery_entry->y, ActionType::RUN);
+        generated_prefix.push_back(Waypoint { .x = start_recovery_entry->x, .y = start_recovery_entry->y, .action = ActionType::RUN });
         generated_prefix.back().strict_arrival = false;
     }
     if (!AppendGeneratedNavmeshWaypoints(
@@ -95,7 +95,7 @@ bool NavigationStateMachine::tryApplyDynamicOverlayToAnchor(
     }
     if (generated_prefix.empty()
         && std::hypot(anchor.x - position_->x, anchor.y - position_->y) > arrival_band_for_startup_bypass(anchor)) {
-        generated_prefix.emplace_back(position_->x, position_->y, ActionType::RUN);
+        generated_prefix.push_back(Waypoint { .x = position_->x, .y = position_->y, .action = ActionType::RUN });
         LogInfo << "Dynamic overlay seeded leading node to avoid single-point path." << VAR(reason) << VAR(continue_index)
                 << VAR(position_->x) << VAR(position_->y);
     }
