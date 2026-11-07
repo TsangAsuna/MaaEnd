@@ -11,7 +11,7 @@
 #include <MaaUtils/Logger.h>
 #include <meojson/json.hpp>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/controller_type_utils.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
@@ -115,7 +115,7 @@ void arm_stop_probe(const Context& ctx, const Waypoint& waypoint, FindState& fin
         return;
     }
     PromptScanProfile profile;
-    if (!TryLoadPromptScanProfile(ctx.maa_context, waypoint.find_stop, ctx.action_wrapper->controllerType(), &profile)) {
+    if (!TryLoadPromptScanProfile(ctx.maa_context, waypoint.find_stop, ctx.input_backend->controller_type.c_str(), &profile)) {
         return;
     }
     find.stop_probe = std::move(profile);
@@ -162,7 +162,7 @@ bool approach_sighting(const Context& ctx, FindState& find, const MaaRect& box, 
         if (!walk_through) {
             ctx.motion_controller->setForwardState(false);
             // 停下也算移动指令, 紧接着的转向会被后端静默期吞掉
-            SleepFor(ctx.action_wrapper->steeringProfile().action_quiet_period_ms);
+            SleepFor(SteeringProfileOf(*ctx.input_backend).action_quiet_period_ms);
         }
         const double degrees_per_px = kTurnDegreesPerCircle / static_cast<double>(ComputeTurn360Units(frame_width));
         const double yaw_deg = static_cast<double>(offset_px) * degrees_per_px * kFindSteerGain;
@@ -177,8 +177,8 @@ bool approach_sighting(const Context& ctx, FindState& find, const MaaRect& box, 
     if (static_cast<double>(center_y) > static_cast<double>(frame_height) * kFindPassedCenterYRatio) {
         LogDebug << "FIND: target is behind, stepping back." << VAR(find.steps) << VAR(center_y);
         ctx.motion_controller->setForwardState(false);
-        ctx.action_wrapper->setMovementStateSync({ .backward = true }, kFindBackwardPulseMs);
-        ctx.action_wrapper->setMovementStateSync({}, 0);
+        SetMovementStateSync(ctx.input_backend, { .backward = true }, kFindBackwardPulseMs);
+        SetMovementStateSync(ctx.input_backend, {}, 0);
         return true;
     }
 
@@ -367,7 +367,7 @@ Result TickFindTarget(const Context& ctx)
         return fail_find(ctx, "find_criteria_missing", "FIND point has neither find_stop nor find_arrive.");
     }
 
-    MaaController* controller = ctx.action_wrapper->getCtrl();
+    MaaController* controller = ctx.input_backend->ctrl;
     ScopedImageBuffer image;
     if (controller == nullptr || !CaptureFreshFrame(controller, image.Get())) {
         ctx.motion_controller->setForwardState(false);

@@ -1,6 +1,6 @@
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_time.h"
@@ -9,15 +9,9 @@
 namespace mapnavigator
 {
 
-ActionExecutor::ActionExecutor(ActionWrapper* action_wrapper, MotionController* motion_controller)
-    : action_wrapper_(action_wrapper)
-    , motion_controller_(motion_controller)
+void ExecuteSprint(MotionController* motion_controller)
 {
-}
-
-void ActionExecutor::sprint()
-{
-    if (motion_controller_->triggerSprint()) {
+    if (motion_controller->triggerSprint()) {
         LogInfo << "Action: SPRINT triggered.";
     }
     else {
@@ -25,27 +19,27 @@ void ActionExecutor::sprint()
     }
 }
 
-void ActionExecutor::jump()
+void ExecuteJump(InputBackend* input_backend, MotionController* motion_controller)
 {
-    motion_controller_->setForwardState(false);
-    action_wrapper_->triggerJumpSync(kActionJumpHoldMs);
+    motion_controller->setForwardState(false);
+    TriggerJumpSync(input_backend, kActionJumpHoldMs);
     LogInfo << "Action: JUMP triggered.";
     SleepFor(kActionJumpSettleMs);
 }
 
-void ActionExecutor::interact()
+void ExecuteInteract(InputBackend* input_backend, MotionController* motion_controller)
 {
-    motion_controller_->setForwardState(false);
+    motion_controller->setForwardState(false);
     for (int i = 0; i < kActionInteractAttempts; ++i) {
-        action_wrapper_->triggerInteractSync(kActionInteractHoldMs);
+        TriggerInteractSync(input_backend, kActionInteractHoldMs);
     }
     LogInfo << "Action: INTERACT completed.";
 }
 
-void ActionExecutor::fight()
+void ExecuteFight(InputBackend* input_backend, MotionController* motion_controller)
 {
-    motion_controller_->setForwardState(false);
-    action_wrapper_->clickMouseLeftSync();
+    motion_controller->setForwardState(false);
+    ClickMouseLeftSync(input_backend);
     LogInfo << "Action: FIGHT triggered.";
 }
 

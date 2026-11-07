@@ -4,12 +4,11 @@
 #include <MaaFramework/MaaAPI.h>
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_math.h"
 #include "../navi_time.h"
-#include "../semantic/action_executor.h"
 #include "../semantic/async_prompt_action.h"
 #include "../semantic/heading_turn.h"
 #include "../semantic/semantic_helpers.h"
@@ -25,27 +24,25 @@ namespace mapnavigator
 
 NavigationStateMachine::NavigationStateMachine(
     const NaviParam& param,
-    ActionWrapper* action_wrapper,
+    InputBackend* input_backend,
     PositionProvider* position_provider,
     NavigationSession* session,
     MotionController* motion_controller,
-    ActionExecutor* action_executor,
     NaviPosition* position,
     std::function<bool()> should_stop,
     MaaContext* maa_context)
     : param_(param)
-    , action_wrapper_(action_wrapper)
+    , input_backend_(input_backend)
     , position_provider_(position_provider)
     , session_(session)
     , motion_controller_(motion_controller)
-    , action_executor_(action_executor)
     , position_(position)
     , should_stop_(std::move(should_stop))
     , maa_context_(maa_context)
     , collect_prompt_(kCollectPromptSpec, maa_context, session, position)
     , interact_prompt_(kInteractPromptSpec, maa_context, session, position)
     , device_recovery_(maa_context, motion_controller, position_provider, session, position)
-    , walk_mode_(action_wrapper)
+    , walk_mode_(input_backend)
 {
     LogInfo << "Navigation route runner selected. backend=orchestrated";
 }
@@ -59,11 +56,10 @@ NavigationStateMachine::~NavigationStateMachine()
 semantic_nodes::Context NavigationStateMachine::semanticContext()
 {
     return {
-        .action_wrapper = action_wrapper_,
+        .input_backend = input_backend_,
         .position_provider = position_provider_,
         .session = session_,
         .motion_controller = motion_controller_,
-        .action_executor = action_executor_,
         .position = position_,
         .runtime_state = &runtime_state_,
         .maa_context = maa_context_,
@@ -111,7 +107,7 @@ bool NavigationStateMachine::tickPhase(NaviPhase phase)
 {
     if (!last_tick_phase_ || *last_tick_phase_ != phase) {
         last_tick_phase_ = phase;
-        action_wrapper_->noteHeadingDisturbed();
+        ++input_backend_->heading_epoch;
     }
     // 放在所有提前返回之前, 否则可能一直停在走路模式
     updateWalkMode(phase);

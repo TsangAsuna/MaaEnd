@@ -8,7 +8,7 @@
 
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_time.h"
@@ -114,7 +114,7 @@ void NavigationStateMachine::startPromptScanners()
                     << VAR(prompt->spec().recognition_node);
             continue;
         }
-        prompt->start(base_roi, action_wrapper_->controllerType());
+        prompt->start(base_roi, input_backend_->controller_type.c_str());
     }
 }
 
@@ -125,7 +125,7 @@ void NavigationStateMachine::startDeviceProbe()
         LogWarn << "Blocking-device probe not started: could not read its ROI from the pipeline." << VAR(kObstacleDeviceProbeNode);
         return;
     }
-    device_recovery_.start(base_roi, action_wrapper_->controllerType());
+    device_recovery_.start(base_roi, input_backend_->controller_type.c_str());
 }
 
 void NavigationStateMachine::preWarmPromptRecognition()
@@ -147,7 +147,7 @@ bool NavigationStateMachine::tryZiplineMountPrompt(const Waypoint& waypoint, con
     }
     if (zipline_mount_scanner_ == nullptr && maa_context_ != nullptr) {
         PromptScanProfile profile;
-        if (!TryLoadPromptScanProfile(maa_context_, kZiplineMountScanNode, action_wrapper_->controllerType(), &profile)) {
+        if (!TryLoadPromptScanProfile(maa_context_, kZiplineMountScanNode, input_backend_->controller_type.c_str(), &profile)) {
             LogWarn << "Zipline mount pre-filter not started; the chain stops on arrival instead." << VAR(kZiplineMountScanNode);
             return false;
         }

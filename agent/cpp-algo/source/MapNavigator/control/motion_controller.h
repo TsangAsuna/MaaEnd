@@ -8,12 +8,10 @@
 namespace mapnavigator
 {
 
-class ActionWrapper;
-
 class MotionController
 {
 public:
-    MotionController(ActionWrapper* action_wrapper, bool enable_local_driver, bool enable_sprint);
+    MotionController(InputBackend* input_backend, bool enable_local_driver, bool enable_sprint);
 
     void stop();
     void setForwardState(bool forward);
@@ -39,7 +37,7 @@ private:
     void armSteeringQuietPeriod();
     void holdPosition();
 
-    ActionWrapper* action_wrapper_;
+    InputBackend* input_backend_;
     bool enable_local_driver_;
     bool enable_sprint_;
     SteeringTransportProfile steering_profile_ {};

@@ -12,7 +12,7 @@
 #include <MaaUtils/Logger.h>
 #include <meojson/json.hpp>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_time.h"
@@ -121,9 +121,9 @@ public:
     {
         const double reset_delta_deg =
             kZiplinePitchMaximumElevationDeg + kZiplinePitchMaximumDepressionDeg + kZiplinePitchResetOvershootDeg;
-        const int units = static_cast<int>(std::lround(-reset_delta_deg * ctx_.action_wrapper->defaultPitchUnitsPerDegree()));
-        if (ctx_.action_wrapper->usesTouchBackend()) {
-            return units != 0 && ctx_.action_wrapper->sendViewDeltaSync(0, units);
+        const int units = static_cast<int>(std::lround(-reset_delta_deg * PitchUnitsPerDegree(*ctx_.input_backend)));
+        if (UsesTouchBackend(*ctx_.input_backend)) {
+            return units != 0 && SendViewDeltaSync(ctx_.input_backend, 0, units);
         }
         if (ctx_.maa_context == nullptr) {
             LogWarn << "Zipline aim: no pipeline context to reset the pitch.";
@@ -143,7 +143,7 @@ public:
 
     std::optional<double> turnYaw(double delta_deg) override
     {
-        const double cap = ctx_.action_wrapper->steeringProfile().max_batch_delta_deg;
+        const double cap = SteeringProfileOf(*ctx_.input_backend).max_batch_delta_deg;
         const double step = std::clamp(delta_deg, -cap, cap);
         if (!TurnToHeadingOnce(ctx_, step)) {
             return std::nullopt;
@@ -153,13 +153,13 @@ public:
 
     bool turnPitch(double delta_deg) override
     {
-        const SteeringTransportProfile profile = ctx_.action_wrapper->steeringProfile();
+        const SteeringTransportProfile profile = SteeringProfileOf(*ctx_.input_backend);
         const int step_count = static_cast<int>(std::ceil(std::abs(delta_deg) / profile.max_batch_delta_deg));
         const int step_interval_ms = std::max<int>(kHeadingTurnStepIntervalMs, profile.min_send_interval_ms);
         // 屏幕 dy 向下为正, 抬头要取负
-        const int units = static_cast<int>(std::lround(-delta_deg / step_count * ctx_.action_wrapper->defaultPitchUnitsPerDegree()));
+        const int units = static_cast<int>(std::lround(-delta_deg / step_count * PitchUnitsPerDegree(*ctx_.input_backend)));
         for (int step = 0; step < step_count; ++step) {
-            if (!ctx_.action_wrapper->sendViewDeltaSync(0, units)) {
+            if (!SendViewDeltaSync(ctx_.input_backend, 0, units)) {
                 return false;
             }
             if (step + 1 < step_count) {
@@ -174,10 +174,10 @@ public:
     void fireLaunch() override
     {
         ctx_.motion_controller->setForwardState(false);
-        ctx_.action_wrapper->triggerZiplineLaunchSync();
+        TriggerZiplineLaunchSync(ctx_.input_backend);
     }
 
-    void dismount() override { ctx_.action_wrapper->triggerZiplineDismountSync(kZiplineDismountHoldMs); }
+    void dismount() override { TriggerZiplineDismountSync(ctx_.input_backend, kZiplineDismountHoldMs); }
 
     void wait(int32_t ms) override { SleepFor(ms); }
 

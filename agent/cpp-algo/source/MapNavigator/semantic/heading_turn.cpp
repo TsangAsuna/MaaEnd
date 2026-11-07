@@ -6,7 +6,7 @@
 
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_math.h"
@@ -25,7 +25,7 @@ bool TurnToHeadingOnce(const Context& ctx, double heading_delta, const std::func
         return true;
     }
 
-    const SteeringTransportProfile profile = ctx.action_wrapper->steeringProfile();
+    const SteeringTransportProfile profile = SteeringProfileOf(*ctx.input_backend);
     const int step_count = static_cast<int>(std::ceil(std::abs(heading_delta) / profile.max_batch_delta_deg));
     const double step_deg = heading_delta / step_count;
     const int step_interval_ms = std::max<int>(kHeadingTurnStepIntervalMs, profile.min_send_interval_ms);
@@ -34,11 +34,11 @@ bool TurnToHeadingOnce(const Context& ctx, double heading_delta, const std::func
         if (should_stop && should_stop()) {
             return false;
         }
-        int units = static_cast<int>(std::lround(step_deg * ctx.action_wrapper->defaultTurnUnitsPerDegree()));
+        int units = static_cast<int>(std::lround(step_deg * TurnUnitsPerDegree(*ctx.input_backend)));
         if (units == 0) {
             units = step_deg > 0.0 ? 1 : -1;
         }
-        if (!ctx.action_wrapper->sendViewDeltaSync(units, 0)) {
+        if (!SendViewDeltaSync(ctx.input_backend, units, 0)) {
             return false;
         }
         if (step + 1 < step_count) {
@@ -100,7 +100,7 @@ bool CommitHeadingTurn(const Context& ctx, double heading_delta)
         return false;
     }
     SleepFor(kWaitAfterFirstTurnMs);
-    ctx.action_wrapper->pulseForwardSync(kPostHeadingForwardPulseMs);
+    PulseForwardSync(ctx.input_backend, kPostHeadingForwardPulseMs);
     ctx.motion_controller->setForwardState(false);
     SleepFor(kWaitAfterFirstTurnMs);
     return true;
@@ -156,7 +156,7 @@ Result ConsumeHeadingNodes(const Context& ctx)
 
         if (std::abs(heading_delta) <= 1.0) {
             LogInfo << "Heading-only node already aligned." << VAR(target_heading) << VAR(start_heading);
-            ctx.action_wrapper->pulseForwardSync(kPostHeadingForwardPulseMs);
+            PulseForwardSync(ctx.input_backend, kPostHeadingForwardPulseMs);
             ctx.motion_controller->setForwardState(false);
         }
         else if (!CommitHeadingTurn(ctx, heading_delta)) {

@@ -21,11 +21,10 @@
 namespace mapnavigator
 {
 
-class ActionExecutor;
-class ActionWrapper;
 class MotionController;
 class PositionProvider;
 class RoiTemplateScanner;
+struct InputBackend;
 struct RouteMeasurement;
 struct TickFix;
 enum class TickStep;
@@ -43,11 +42,10 @@ class NavigationStateMachine
 public:
     NavigationStateMachine(
         const NaviParam& param,
-        ActionWrapper* action_wrapper,
+        InputBackend* input_backend,
         PositionProvider* position_provider,
         NavigationSession* session,
         MotionController* motion_controller,
-        ActionExecutor* action_executor,
         NaviPosition* position,
         std::function<bool()> should_stop,
         MaaContext* maa_context);
@@ -161,11 +159,10 @@ private:
     void tryRunPromptSubtaskAtRouteTail();
 
     const NaviParam& param_;
-    ActionWrapper* action_wrapper_;
+    InputBackend* input_backend_;
     PositionProvider* position_provider_;
     NavigationSession* session_;
     MotionController* motion_controller_;
-    ActionExecutor* action_executor_;
     NaviPosition* position_;
     std::function<bool()> should_stop_;
     MaaContext* maa_context_;

@@ -140,7 +140,7 @@ Result arrive_key_interact(const Context& ctx, const Waypoint& waypoint, const s
     }
     else {
         ArmCameraAlign(ctx.runtime_state);
-        ctx.action_executor->interact();
+        ExecuteInteract(ctx.input_backend, ctx.motion_controller);
     }
     return CompleteArrival(ctx, waypoint, node_idx, "waypoint_action_completed");
 }
@@ -240,15 +240,15 @@ Result HandleArrival(const Context& ctx, const Waypoint& waypoint, double actual
         }
         return arrive_key_interact(ctx, waypoint, node_idx);
     case ActionType::SPRINT:
-        ctx.action_executor->sprint();
+        ExecuteSprint(ctx.motion_controller);
         break;
     case ActionType::JUMP:
         ArmCameraAlign(ctx.runtime_state);
-        ctx.action_executor->jump();
+        ExecuteJump(ctx.input_backend, ctx.motion_controller);
         break;
     case ActionType::FIGHT:
         ArmCameraAlign(ctx.runtime_state);
-        ctx.action_executor->fight();
+        ExecuteFight(ctx.input_backend, ctx.motion_controller);
         break;
     // HEADING/ZONE 没坐标, NAVMESH 展开后换成规划点, 实际到不了这里
     case ActionType::RUN:

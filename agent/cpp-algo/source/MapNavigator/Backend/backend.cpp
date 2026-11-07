@@ -5,6 +5,7 @@
 #include "../../MapLocator/MapLocateAction.h"
 #include "../control/controller_info_utils.h"
 #include "../control/controller_type_utils.h"
+#include "../sensing/sensitivity_observer.h"
 #include "Adb/adb_input_backend.h"
 #include "Desktop/desktop_input_backend.h"
 #include "Linux/linux_input_backend.h"
@@ -12,6 +13,19 @@
 
 namespace mapnavigator
 {
+
+namespace
+{
+
+bool send_view_delta(const InputBackend& backend, int dx, int dy)
+{
+    if (backend.kind == BackendKind::Adb) {
+        return backend::adb::SendAdbViewDeltaSync(backend, dx, dy);
+    }
+    return backend::desktop::SendDesktopViewDeltaSync(backend, dx, dy);
+}
+
+} // namespace
 
 InputBackend OpenInputBackend(MaaController* ctrl)
 {
@@ -53,6 +67,18 @@ bool IsInputBackendSupported(const InputBackend& backend)
     return backend.ctrl != nullptr;
 }
 
+double TurnUnitsPerDegree(const InputBackend& backend)
+{
+    // 灵敏度校正系数只在这里和下面的俯仰处乘
+    return backend.default_turn_units_per_degree * sensitivity::TurnUnitsScale();
+}
+
+double PitchUnitsPerDegree(const InputBackend& backend)
+{
+    // 游戏视角灵敏度两轴共用, 偏航测出的倍率俯仰照乘
+    return backend.default_pitch_units_per_degree * sensitivity::TurnUnitsScale();
+}
+
 SteeringTransportProfile SteeringProfileOf(const InputBackend& backend)
 {
     if (backend.kind == BackendKind::Adb) {
@@ -62,6 +88,16 @@ SteeringTransportProfile SteeringProfileOf(const InputBackend& backend)
         return backend::Linux::LinuxSteeringProfile();
     }
     return backend::desktop::DesktopSteeringProfile();
+}
+
+bool SupportsSprint(const InputBackend&)
+{
+    return true;
+}
+
+bool SupportsWalkToggle(const InputBackend&)
+{
+    return true;
 }
 
 void SetMovementStateSync(InputBackend* backend, MovementState state, int delay_millis)
@@ -158,12 +194,18 @@ void TriggerZiplineDismountSync(InputBackend* backend, int hold_millis)
     backend::desktop::TriggerDesktopZiplineDismountSync(backend, hold_millis);
 }
 
-bool SendViewDeltaSync(const InputBackend& backend, int dx, int dy)
+bool SendViewDeltaSync(InputBackend* backend, int dx, int dy)
 {
-    if (backend.kind == BackendKind::Adb) {
-        return backend::adb::SendAdbViewDeltaSync(backend, dx, dy);
+    const bool sent = send_view_delta(*backend, dx, dy);
+    const double units_per_degree = TurnUnitsPerDegree(*backend);
+    if (sent && dx != 0 && units_per_degree > 0.0) {
+        sensitivity::NoteTurnIssued(static_cast<double>(dx) / units_per_degree);
     }
-    return backend::desktop::SendDesktopViewDeltaSync(backend, dx, dy);
+    // 送失败的拖拽也可能已动了视角, 照样记一次
+    if (dx != 0) {
+        ++backend->heading_epoch;
+    }
+    return sent;
 }
 
 } // namespace mapnavigator

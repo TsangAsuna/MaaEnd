@@ -12,7 +12,7 @@
 
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_math.h"
@@ -211,7 +211,7 @@ struct StrictSettle
             if (previous_residual && residual > *previous_residual + kStrictSettleAcceptBandWu) {
                 return incomplete("diverging");
             }
-            if (!ctx.action_wrapper->supportsWalkToggle()) {
+            if (!SupportsWalkToggle(*ctx.input_backend)) {
                 return incomplete("walking_unavailable");
             }
             if (const std::optional<bool> verdict = alignTowardGoal()) {
@@ -319,7 +319,7 @@ bool SettleAtStrictGoal(const Context& ctx, const Waypoint& waypoint, const std:
         .waypoint = waypoint,
         .budget = { .deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kStrictSettleBudgetMs),
                     .should_stop = should_stop },
-        .input = ctx.action_wrapper->usesTouchBackend() ? kStrictSettleTouchProfile : kStrictSettleKeyboardProfile,
+        .input = UsesTouchBackend(*ctx.input_backend) ? kStrictSettleTouchProfile : kStrictSettleKeyboardProfile,
     };
     return settle.run();
 }

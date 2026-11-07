@@ -6,7 +6,7 @@
 #include <MaaFramework/MaaAPI.h>
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_log.h"
@@ -61,7 +61,7 @@ Result ProbeTriggerWhileNavigating(const Context& ctx)
     trigger.last_probe_at = now;
 
     // 定位这一拍刚截过图, 缓存即当前画面
-    MaaController* controller = ctx.action_wrapper->getCtrl();
+    MaaController* controller = ctx.input_backend->ctrl;
     ScopedImageBuffer image;
     if (controller == nullptr || !MaaControllerCachedImage(controller, image.Get()) || MaaImageBufferIsEmpty(image.Get())) {
         return {};

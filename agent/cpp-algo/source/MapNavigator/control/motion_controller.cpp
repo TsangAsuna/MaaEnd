@@ -6,10 +6,10 @@
 
 #include <MaaUtils/Logger.h>
 
+#include "../Backend/backend.h"
 #include "../navi_config.h"
 #include "../navi_time.h"
 #include "../sensing/latency_observer.h"
-#include "action_wrapper.h"
 #include "motion_controller.h"
 #include "walk_mode.h"
 
@@ -42,13 +42,13 @@ LocalActionTraits local_action_traits_of(LocalDriverAction action)
 
 } // namespace
 
-MotionController::MotionController(ActionWrapper* action_wrapper, bool enable_local_driver, bool enable_sprint)
-    : action_wrapper_(action_wrapper)
+MotionController::MotionController(InputBackend* input_backend, bool enable_local_driver, bool enable_sprint)
+    : input_backend_(input_backend)
     , enable_local_driver_(enable_local_driver)
     , enable_sprint_(enable_sprint)
 {
-    if (action_wrapper_ != nullptr) {
-        steering_profile_ = action_wrapper_->steeringProfile();
+    if (input_backend_ != nullptr) {
+        steering_profile_ = SteeringProfileOf(*input_backend_);
     }
 }
 
@@ -70,7 +70,7 @@ void MotionController::setForwardState(bool forward)
     }
 
     if (!is_moving_forward_) {
-        action_wrapper_->setMovementStateSync({ .forward = true }, 0);
+        SetMovementStateSync(input_backend_, { .forward = true }, 0);
     }
     is_moving_ = true;
     is_moving_forward_ = true;
@@ -83,7 +83,7 @@ void MotionController::reassertForward()
         return;
     }
     // 后端会跳过与缓存状态相同的按键, 须松开再按, 且绕过 setAction 以免清掉在途转向
-    action_wrapper_->resetForwardWalkSync(kWalkResetReleaseMs);
+    ResetForwardWalkSync(input_backend_, kWalkResetReleaseMs);
 }
 
 TurnCommandResult MotionController::applySteering(double yaw_delta_deg, int64_t tick_gap_ms)
@@ -99,7 +99,7 @@ TurnCommandResult MotionController::applySteering(double yaw_delta_deg, int64_t 
 
     const bool should_pause_motion = !steering_profile_.supports_concurrent_move_and_look && isMoving();
     if (should_pause_motion) {
-        action_wrapper_->setMovementStateSync({}, 0);
+        SetMovementStateSync(input_backend_, {}, 0);
     }
 
     const TurnCommandResult result = emitBatches(yaw_delta_deg, planBatchCount(yaw_delta_deg, tick_gap_ms));
@@ -119,13 +119,13 @@ TurnCommandResult MotionController::applySteering(double yaw_delta_deg, int64_t 
 
 bool MotionController::supportsSprint() const
 {
-    return enable_sprint_ && action_wrapper_ != nullptr && action_wrapper_->supportsSprint();
+    return enable_sprint_ && input_backend_ != nullptr && SupportsSprint(*input_backend_);
 }
 
 void MotionController::setSprintSuppressed(bool suppressed)
 {
-    if (suppressed && !sprint_suppressed_ && sprint_active_ && is_moving_forward_ && action_wrapper_ != nullptr) {
-        action_wrapper_->resetForwardWalkSync(kSprintCancelReleaseMs);
+    if (suppressed && !sprint_suppressed_ && sprint_active_ && is_moving_forward_ && input_backend_ != nullptr) {
+        ResetForwardWalkSync(input_backend_, kSprintCancelReleaseMs);
         sprint_active_ = false;
         LogInfo << "Sprint cancelled near collect point (dropped to walking speed).";
     }
@@ -142,7 +142,7 @@ bool MotionController::triggerSprint()
     }
 
     armSteeringQuietPeriod();
-    action_wrapper_->triggerSprintSync();
+    TriggerSprintSync(input_backend_);
     walkmode::NoteSprintTriggered();
     sprint_active_ = true;
     LogInfo << "Sprint state armed.";
@@ -151,7 +151,7 @@ bool MotionController::triggerSprint()
 
 void MotionController::holdPosition()
 {
-    action_wrapper_->setMovementStateSync({}, 0);
+    SetMovementStateSync(input_backend_, {}, 0);
     has_applied_action_ = false;
     is_moving_ = false;
     is_moving_forward_ = false;
@@ -170,9 +170,9 @@ void MotionController::setAction(LocalDriverAction action, bool force)
 
     armSteeringQuietPeriod();
 
-    action_wrapper_->setMovementStateSync(traits.movement, 0);
+    SetMovementStateSync(input_backend_, traits.movement, 0);
     if (traits.jumps) {
-        action_wrapper_->triggerJumpSync(kActionJumpHoldMs);
+        TriggerJumpSync(input_backend_, kActionJumpHoldMs);
     }
 
     applied_action_ = action;
@@ -252,12 +252,12 @@ TurnCommandResult MotionController::sendViewDelta(double delta_degrees)
         return result;
     }
 
-    int units = static_cast<int>(std::lround(delta_degrees * action_wrapper_->defaultTurnUnitsPerDegree()));
+    int units = static_cast<int>(std::lround(delta_degrees * TurnUnitsPerDegree(*input_backend_)));
     if (units == 0) {
         units = delta_degrees > 0.0 ? 1 : -1;
     }
     const auto send_started_at = std::chrono::steady_clock::now();
-    const bool sent = action_wrapper_->sendViewDeltaSync(units, 0);
+    const bool sent = SendViewDeltaSync(input_backend_, units, 0);
     const int64_t send_ms = ElapsedMs(send_started_at);
     result.send_ms = send_ms;
     if (!sent) {

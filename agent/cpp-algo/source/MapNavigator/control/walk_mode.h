@@ -2,7 +2,7 @@
 
 namespace mapnavigator
 {
-class ActionWrapper;
+struct InputBackend;
 }
 
 namespace mapnavigator::walkmode
@@ -16,7 +16,7 @@ void NoteSprintTriggered();
 class Toggle
 {
 public:
-    explicit Toggle(ActionWrapper* action_wrapper);
+    explicit Toggle(InputBackend* input_backend);
     ~Toggle();
 
     Toggle(const Toggle&) = delete;
@@ -28,7 +28,7 @@ public:
     bool engaged() const { return Engaged(); }
 
 private:
-    ActionWrapper* action_wrapper_ = nullptr;
+    InputBackend* input_backend_ = nullptr;
 };
 
 } // namespace mapnavigator::walkmode

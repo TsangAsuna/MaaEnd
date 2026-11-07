@@ -9,7 +9,7 @@
 #include <MaaFramework/MaaAPI.h>
 #include <MaaUtils/Logger.h>
 
-#include "../control/action_wrapper.h"
+#include "../Backend/backend.h"
 #include "../control/motion_controller.h"
 #include "../navi_config.h"
 #include "../navi_log.h"
@@ -65,7 +65,7 @@ std::string scene_recovery_override(MaaSize esc_used)
 
 bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
 {
-    const uint64_t heading_epoch = action_wrapper_->headingEpoch();
+    const uint64_t heading_epoch = input_backend_->heading_epoch;
     const bool prior_usable = !force_global_search && param_.heading_source == HeadingSource::Camera && position_->valid
                               && prior_observation_epoch_ && *prior_observation_epoch_ == heading_epoch
                               && session_->phase() == NaviPhase::Navigate;
@@ -249,7 +249,7 @@ bool NavigationStateMachine::sceneRecoveryAllowed()
         LogInfo << "Scene recovery declined." << VAR(attempted) << VAR(foreign_ui) << VAR(own_ui);
         return false;
     }
-    if (dialog_on_screen(maa_context_, action_wrapper_->getCtrl())) {
+    if (dialog_on_screen(maa_context_, input_backend_->ctrl)) {
         LogInfo << "Scene recovery declined: dialog on screen.";
         return false;
     }
@@ -364,7 +364,7 @@ TickStep NavigationStateMachine::runRiverFallRecovery(const NavigateTick& tick)
             NormalizeAngle(route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
     }
-    if (AdvanceRiverFallRecovery(&runtime_state_.river_fall, action_wrapper_, motion_controller_, *position_, tick.fix.current_heading)
+    if (AdvanceRiverFallRecovery(&runtime_state_.river_fall, input_backend_, motion_controller_, *position_, tick.fix.current_heading)
         == RiverFallStep::Cleared) {
         return EndTickWith(resumeAfterEscape("river_fall_recovered"));
     }
