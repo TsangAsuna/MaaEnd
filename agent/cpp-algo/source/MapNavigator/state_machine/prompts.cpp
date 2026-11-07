@@ -219,7 +219,8 @@ bool NavigationStateMachine::tryRunPromptSubtaskWhileWalking(const RouteMeasurem
         if (outcome == PromptTriggerOutcome::NotTriggered) {
             continue;
         }
-        failure_trail_.note(
+        NoteTimedFailure(
+            &failure_trail_,
             std::chrono::steady_clock::now(),
             std::format("prompt {} {}", prompts[index]->spec().tag, outcome == PromptTriggerOutcome::Recognized ? "recognized" : "missed"),
             ElapsedMs(started_at));

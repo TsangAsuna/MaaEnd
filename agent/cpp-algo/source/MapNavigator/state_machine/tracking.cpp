@@ -63,7 +63,7 @@ void NavigationStateMachine::trackRoute(NavigateTick& tick)
     tick.now = std::chrono::steady_clock::now();
     tick.fix = readFix(tick.now);
     const size_t node_idx_before_tracking = session_->currentNodeIdx();
-    tick.route = RouteTracker::update(session_, &runtime_state_.route, *position_);
+    tick.route = UpdateRouteTracking(&runtime_state_.route, session_, *position_);
     if (session_->currentNodeIdx() != node_idx_before_tracking) {
         runtime_state_.recovery = {};
     }
@@ -127,7 +127,7 @@ void NavigationStateMachine::consumeCorridorPassedWaypoints(NavigateTick& tick)
     }
     runtime_state_.recovery = {};
     runtime_state_.global_reacquire_streak = 0;
-    tick.route = RouteTracker::update(session_, &runtime_state_.route, *position_);
+    tick.route = UpdateRouteTracking(&runtime_state_.route, session_, *position_);
 }
 
 TickStep NavigationStateMachine::checkRouteProgress(NavigateTick& tick)
@@ -296,7 +296,11 @@ TickStep NavigationStateMachine::passArrivedWaypoints(NavigateTick& tick)
         const auto arrival_started_at = std::chrono::steady_clock::now();
         const semantic_nodes::Result arrival_result = semantic_nodes::HandleArrival(semanticContext(), waypoint, route.waypoint_distance);
         if (const int64_t arrival_ms = ElapsedMs(arrival_started_at); arrival_ms >= kFailureTrailSlowArrivalMs) {
-            failure_trail_.note(std::chrono::steady_clock::now(), "arrival " + json::value(waypoint.action).as_string(), arrival_ms);
+            NoteTimedFailure(
+                &failure_trail_,
+                std::chrono::steady_clock::now(),
+                "arrival " + json::value(waypoint.action).as_string(),
+                arrival_ms);
         }
         if (arrival_result.rope_unavailable != 0) {
             return EndTickWith(abandonRope(arrival_result.rope_unavailable));
@@ -313,7 +317,7 @@ TickStep NavigationStateMachine::passArrivedWaypoints(NavigateTick& tick)
             || !session_->hasCurrentWaypoint()) {
             return TickStep::EndTick;
         }
-        route = RouteTracker::update(session_, &runtime_state_.route, *position_);
+        route = UpdateRouteTracking(&runtime_state_.route, session_, *position_);
         waypoint = session_->currentWaypoint();
         if (!route.valid || !IsContinuousRun(waypoint) || waypoint.drop_from) {
             return TickStep::EndTick;

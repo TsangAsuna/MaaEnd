@@ -178,7 +178,7 @@ void advance_passed_run_waypoints(
 
 } // namespace
 
-RouteMeasurement RouteTracker::update(NavigationSession* session, RouteTrackerState* state, const NaviPosition& position)
+RouteMeasurement UpdateRouteTracking(RouteTrackerState* state, NavigationSession* session, const NaviPosition& position)
 {
     RouteMeasurement tracking;
     if (session == nullptr || state == nullptr || !session->hasCurrentWaypoint()) {

@@ -43,11 +43,11 @@ SteeringLoop::Reading SteeringLoop::observe(double steer_heading, std::chrono::s
 
 SteeringCommand SteeringLoop::decide(double heading_error, double heading_rate_deg)
 {
-    return SteeringController::update(
+    return UpdateSteering(
+        &steering_rate_.turn_latch_sign,
         heading_error,
         heading_rate_deg,
         motion_controller_->isMovingForward(),
-        steering_rate_.turn_latch_sign,
         steering_rate_.pending_turn_deg);
 }
 

@@ -294,7 +294,9 @@ bool NavigationStateMachine::failNavigation(
     stopMotion();
     ResetNavigationAssistState(&runtime_state_);
     session_->updatePhase(NaviPhase::Failed, reason);
-    failure_trail_.log(std::chrono::steady_clock::now());
+    const TimePoint failed_at = std::chrono::steady_clock::now();
+    PruneFailureTrail(&failure_trail_, failed_at);
+    LogFailureTrail(failure_trail_, failed_at);
     LogError << log_message << VAR(current_distance) << VAR(yaw_error) << VAR(stalled_ms);
     return true;
 }
