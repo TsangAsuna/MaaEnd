@@ -93,7 +93,7 @@ void NavigationStateMachine::stopScanners()
         position_provider_->setFrameObserver(nullptr);
     }
     if (motion_controller_ != nullptr) {
-        motion_controller_->setSprintSuppressed(false);
+        motion_controller_->sprint_suppressed = false;
     }
     collect_prompt_.stop();
     interact_prompt_.stop();
@@ -202,7 +202,10 @@ void NavigationStateMachine::updatePromptSprintSuppression()
 
     const double nearest_sq = nearestPromptDistance().distance_sq;
     const bool approaching_prompt = nearest_sq >= 0.0 && nearest_sq <= kCollectSprintSuppressBandWu * kCollectSprintSuppressBandWu;
-    motion_controller_->setSprintSuppressed(approaching_prompt);
+    if (approaching_prompt && SprintCancellable(*motion_controller_)) {
+        CancelSprint(motion_controller_);
+    }
+    motion_controller_->sprint_suppressed = approaching_prompt;
 }
 
 bool NavigationStateMachine::tryRunPromptSubtaskWhileWalking(const RouteMeasurement& route)

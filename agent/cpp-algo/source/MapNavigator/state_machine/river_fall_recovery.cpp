@@ -14,7 +14,7 @@ namespace mapnavigator
 RiverFallStep AdvanceRiverFallRecovery(
     RiverFallRecoveryState* state,
     InputBackend* input_backend,
-    MotionController* motion_controller,
+    Motion* motion_controller,
     const NaviPosition& position,
     double current_heading)
 {
@@ -24,7 +24,7 @@ RiverFallStep AdvanceRiverFallRecovery(
         LogInfo << "River-fall recovery cleared; resuming navigation." << VAR(rf_displacement) << VAR(current_heading);
         return RiverFallStep::Cleared;
     }
-    motion_controller->setForwardState(false);
+    HoldPosition(motion_controller);
     // 上岸瞬间的箭头读数不可信, 先站定再算转身
     if (!state->settled) {
         state->settled = true;
@@ -42,7 +42,7 @@ RiverFallStep AdvanceRiverFallRecovery(
     }
     // 角色朝向要迈一步才跟上镜头, 这一步沿相机方向离水
     PulseForwardSync(input_backend, kRiverFallRecoveryPulseMs);
-    motion_controller->setForwardState(false);
+    HoldPosition(motion_controller);
     LogInfo << "River-fall recovery inland pulse." << VAR(current_heading) << VAR(rf_displacement) << VAR(position.x) << VAR(position.y);
     return RiverFallStep::Escaping;
 }

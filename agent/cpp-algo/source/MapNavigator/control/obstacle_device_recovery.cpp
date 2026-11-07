@@ -43,7 +43,7 @@ const char* walk_out_entry_for(const std::vector<std::string>& handled)
 
 ObstacleDeviceRecovery::ObstacleDeviceRecovery(
     MaaContext* maa_context,
-    MotionController* motion_controller,
+    Motion* motion_controller,
     PositionProvider* position_provider,
     NavigationSession* session,
     NaviPosition* position)
@@ -127,7 +127,7 @@ DeviceRemovalOutcome ObstacleDeviceRecovery::tryRemove(const RouteMeasurement& r
     const NaviPosition move_start = *position_;
     LogInfo << "Dynamic recovery carrying off the blocking device." << VAR(route.waypoint_distance);
     // 边走边点会点到滚到下面的另一行提示, 移动点击前须站定
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
     session_->noteInteraction();
     const std::optional<std::vector<std::string>> handled = RunTaskForCompletedNodes(maa_context_, kObstacleDeviceEntry, "{}");
     if (!handled) {
@@ -141,7 +141,7 @@ DeviceRemovalOutcome ObstacleDeviceRecovery::tryRemove(const RouteMeasurement& r
     }
     if (const char* walk_out = walk_out_entry_for(*handled); walk_out != nullptr) {
         // 搬起的设备会放回原处, 放下前须先走出来
-        motion_controller_->reassertForward();
+        ReassertForward(motion_controller_);
         if (MaaContextRunTask(maa_context_, walk_out, "{}") == MaaInvalidId) {
             LogWarn << "Blocking-device walk-out did not run." << VAR(walk_out);
             return DeviceRemovalOutcome::StillPinned;

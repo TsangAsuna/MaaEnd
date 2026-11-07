@@ -261,11 +261,11 @@ struct StrictSettle
         LogInfo << "Strict arrival forward pulse." << VAR(residual) << VAR(hold_ms) << VAR(pulses);
         ++pulses;
         const NaviPosition from = fix;
-        ctx.motion_controller->setForwardState(true);
+        MoveForward(ctx.motion_controller);
         const auto pressed_at = std::chrono::steady_clock::now();
         ctx.position->valid = false; // 一开始移动停稳读数就作废
         const bool held = budget.sleep(std::chrono::milliseconds(hold_ms));
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         const double held_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - pressed_at).count();
         if (!held || !capture_still_fix(ctx, budget, &fix)) {
             return incomplete(budget.cancelledOr("budget_exhausted"));

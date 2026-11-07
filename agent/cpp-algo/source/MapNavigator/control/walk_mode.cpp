@@ -27,30 +27,32 @@ void NoteSprintTriggered()
     LogInfo << "Walk mode cleared by sprint (the game leaves walking on its own).";
 }
 
-Toggle::Toggle(InputBackend* input_backend)
-    : input_backend_(input_backend)
+Toggle OpenToggle(InputBackend* input_backend)
 {
+    Toggle toggle;
+    toggle.input_backend = input_backend;
     if (g_walking) {
         LogWarn << "Walk mode belief survived the previous run; restoring jogging before navigating.";
-        request(false);
+        RequestWalk(toggle, false);
     }
+    return toggle;
 }
 
-Toggle::~Toggle()
+void CloseToggle(const Toggle& toggle)
 {
-    request(false);
+    RequestWalk(toggle, false);
 }
 
-void Toggle::request(bool walk)
+void RequestWalk(const Toggle& toggle, bool walk)
 {
     if (walk == g_walking) {
         return;
     }
-    if (input_backend_ == nullptr || !SupportsWalkToggle(*input_backend_)) {
+    if (toggle.input_backend == nullptr || !SupportsWalkToggle(*toggle.input_backend)) {
         return;
     }
 
-    ToggleWalkModeSync(input_backend_);
+    ToggleWalkModeSync(toggle.input_backend);
     g_walking = walk;
     LogInfo << (walk ? "Walk mode engaged (game walking speed)." : "Walk mode released (back to jogging).");
 }

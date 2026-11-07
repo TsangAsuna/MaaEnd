@@ -60,7 +60,7 @@ Result arrive_portal(const Context& ctx, const std::optional<size_t>& node_idx, 
                                              ? PortalTransitState { .phase = PortalTransitPhase::AwaitZone, .started = now }
                                              : PortalTransitState {};
     ctx.position_provider->resetTracking();
-    ctx.motion_controller->setForwardState(true);
+    MoveForward(ctx.motion_controller);
     LogInfo << "Action: PORTAL entered transit flow." << VAR(actual_distance);
     SelectPhaseForCurrentWaypoint(ctx, "portal_entered");
     return Handled();
@@ -189,7 +189,7 @@ Result ConsumeInlineSemantics(const Context& ctx)
     }
 
     if (ctx.session->hasCurrentWaypoint() && IsZoneDeclaration(ctx.session->currentWaypoint())) {
-        ctx.motion_controller->setForwardState(true);
+        MoveForward(ctx.motion_controller);
         return Handled();
     }
     return {};
@@ -214,7 +214,7 @@ Result StartRopeRide(const Context& ctx, const RopeRideInfo& ride)
 Result HandleArrival(const Context& ctx, const Waypoint& waypoint, double actual_distance)
 {
     const std::optional<size_t> node_idx = ctx.session->currentAbsoluteNodeIndex();
-    if (RequiresStrictArrival(waypoint) && ctx.motion_controller->isMoving()) {
+    if (RequiresStrictArrival(waypoint) && ctx.motion_controller->is_moving) {
         StopMotionAndCommitment(ctx);
         SleepFor(kStopWaitMs);
     }

@@ -68,7 +68,7 @@ bool reached_arrive_point(const Context& ctx, const Waypoint& waypoint)
 // 这一段转视角是开环的, 不清掉操舵状态下一段会拿旧朝向操舵
 void leave_find_phase(const Context& ctx)
 {
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     ResetNavigationAssistState(ctx.runtime_state);
     ctx.runtime_state->flow.motionless_hold_ticks = 0;
     ctx.runtime_state->flow.futile_forward_reasserts = 0;
@@ -160,7 +160,7 @@ bool approach_sighting(const Context& ctx, FindState& find, const MaaRect& box, 
     if (std::abs(offset_base) > kFindAlignTolerancePx) {
         const bool walk_through = std::abs(offset_base) <= kFindWalkWhileTurningPx;
         if (!walk_through) {
-            ctx.motion_controller->setForwardState(false);
+            HoldPosition(ctx.motion_controller);
             // 停下也算移动指令, 紧接着的转向会被后端静默期吞掉
             SleepFor(SteeringProfileOf(*ctx.input_backend).action_quiet_period_ms);
         }
@@ -169,21 +169,21 @@ bool approach_sighting(const Context& ctx, FindState& find, const MaaRect& box, 
         LogDebug << "FIND: turning toward the target." << VAR(find.steps) << VAR(offset_px) << VAR(yaw_deg) << VAR(walk_through);
         const bool turned = TurnToHeadingOnce(ctx, yaw_deg);
         if (walk_through) {
-            ctx.motion_controller->setForwardState(true);
+            MoveForward(ctx.motion_controller);
         }
         return turned;
     }
 
     if (static_cast<double>(center_y) > static_cast<double>(frame_height) * kFindPassedCenterYRatio) {
         LogDebug << "FIND: target is behind, stepping back." << VAR(find.steps) << VAR(center_y);
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         SetMovementStateSync(ctx.input_backend, { .backward = true }, kFindBackwardPulseMs);
         SetMovementStateSync(ctx.input_backend, {}, 0);
         return true;
     }
 
     LogDebug << "FIND: walking toward the target." << VAR(find.steps) << VAR(offset_px);
-    ctx.motion_controller->setForwardState(true);
+    MoveForward(ctx.motion_controller);
     return true;
 }
 
@@ -191,14 +191,14 @@ bool approach_sighting(const Context& ctx, FindState& find, const MaaRect& box, 
 Result probe_stop_while_walking(const Context& ctx, const Waypoint& waypoint, MaaController* controller)
 {
     FindState& find = ctx.runtime_state->find;
-    if (waypoint.find_stop.empty() || controller == nullptr || !ctx.motion_controller->isMovingForward()) {
+    if (waypoint.find_stop.empty() || controller == nullptr || !ctx.motion_controller->is_moving_forward) {
         return {};
     }
 
     LogDebug << "FIND: probing the stop node while walking." << VAR(find.steps) << VAR(waypoint.find_stop)
              << VAR(find.stop_probe.has_value());
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kFindStopProbeWindowMs);
-    while (ctx.motion_controller->isMovingForward() && std::chrono::steady_clock::now() < deadline) {
+    while (ctx.motion_controller->is_moving_forward && std::chrono::steady_clock::now() < deadline) {
         ScopedImageBuffer probe;
         if (!CaptureFreshFrame(controller, probe.Get())) {
             break;
@@ -213,7 +213,7 @@ Result probe_stop_while_walking(const Context& ctx, const Waypoint& waypoint, Ma
             continue;
         }
         // 先站住再确认, 走着确认会多滑出去一段
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         SleepFor(kStopWaitMs);
         NodeSighting sighting {};
         if (!RunRecognitionNode(ctx.maa_context, waypoint.find_stop, "{}", probe.Get(), &sighting)) {
@@ -224,7 +224,7 @@ Result probe_stop_while_walking(const Context& ctx, const Waypoint& waypoint, Ma
             return finish_find(ctx, waypoint, "find_target_reached");
         }
         LogDebug << "FIND: stop probe did not confirm; resuming the walk." << VAR(find.steps);
-        ctx.motion_controller->setForwardState(true);
+        MoveForward(ctx.motion_controller);
         SleepFor(kFindStopProbeIntervalMs);
     }
     return {};
@@ -254,7 +254,7 @@ std::optional<Result> check_find_done(const Context& ctx, const Waypoint& waypoi
 
 Result handle_target_miss(const Context& ctx, FindState& find)
 {
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     ++find.miss_streak;
     // 见过的目标漏认几拍先原地等, 从没见过则直接搜
     if (find.last_seen_side != 0 && find.miss_streak < kFindMissGraceTicks) {
@@ -295,7 +295,7 @@ Result pursue_target(const Context& ctx, const Waypoint& waypoint, MaaController
     const int32_t frame_height = MaaImageBufferHeight(image);
     if (frame_width <= 0 || frame_height <= 0) {
         LogWarn << "FIND: the captured frame has no size." << VAR(frame_width) << VAR(frame_height);
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         return hold_find_step();
     }
 
@@ -370,7 +370,7 @@ Result TickFindTarget(const Context& ctx)
     MaaController* controller = ctx.input_backend->ctrl;
     ScopedImageBuffer image;
     if (controller == nullptr || !CaptureFreshFrame(controller, image.Get())) {
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         LogWarn << "FIND: screencap failed, holding this step empty." << VAR(find.steps);
         return hold_find_step();
     }

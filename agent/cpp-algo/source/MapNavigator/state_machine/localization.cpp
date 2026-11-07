@@ -191,7 +191,7 @@ bool NavigationStateMachine::handleLocalizationLoss()
     if (position_provider_->lastCaptureWasBlackScreen()) {
         loss.saw_black_screen = true;
     }
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
 
     const auto loss_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - loss.started_at);
     if (loss_elapsed >= std::chrono::milliseconds(kLocalizationLossTimeoutMs)) {
@@ -228,9 +228,10 @@ bool NavigationStateMachine::handleLocalizationLoss()
         loss.last_unstick_at = now;
         LogInfo << "Localization lost; blind unstick hop issued." << VAR(loss_elapsed.count());
         NoteFailure(&failure_trail_, now, "localization lost blind hop");
-        motion_controller_->setAction(LocalDriverAction::JumpForward, true);
+        ArmSteeringQuietPeriod(motion_controller_);
+        ApplyLocalAction(motion_controller_, LocalDriverAction::JumpForward);
         SleepFor(kActionJumpSettleMs);
-        motion_controller_->setForwardState(false);
+        HoldPosition(motion_controller_);
         return true;
     }
 

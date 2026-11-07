@@ -173,7 +173,7 @@ public:
 
     void fireLaunch() override
     {
-        ctx_.motion_controller->setForwardState(false);
+        HoldPosition(ctx_.motion_controller);
         TriggerZiplineLaunchSync(ctx_.input_backend);
     }
 
@@ -393,7 +393,7 @@ Result StartZiplineHop(const Context& ctx, const Waypoint& waypoint, double actu
 Result TickZiplineRide(const Context& ctx)
 {
     Result result;
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
 
     ZiplineRideMachine& ride = ctx.runtime_state->zipline_ride;
     if (ride.stage() == ZiplineStage::Idle) {

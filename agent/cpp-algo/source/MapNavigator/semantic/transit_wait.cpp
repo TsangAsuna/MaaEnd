@@ -75,7 +75,7 @@ Result TickPortalTransit(const Context& ctx)
         return Handled();
     }
 
-    ctx.motion_controller->setForwardState(true);
+    MoveForward(ctx.motion_controller);
 
     NaviPosition candidate;
     if (!ctx.position_provider->capture(&candidate, true, {})) {
@@ -104,7 +104,7 @@ Result TickTransferWait(const Context& ctx)
         return Handled();
     }
 
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
 
     const auto now = std::chrono::steady_clock::now();
     if (IsUnset(transfer.started)) {
@@ -141,7 +141,7 @@ Result TickTransferWait(const Context& ctx)
 Result TickRopeRide(const Context& ctx)
 {
     RopeRideState& rope = ctx.runtime_state->semantic.rope;
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     const int64_t waited_ms = ElapsedMs(rope.started);
     if (waited_ms < rope.ride_ms) {
         return WaitNextFix(kRelocationRetryIntervalMs);

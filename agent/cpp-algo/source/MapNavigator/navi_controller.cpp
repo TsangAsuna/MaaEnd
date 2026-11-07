@@ -148,7 +148,9 @@ bool navigate_with_backend(MaaContext* ctx, NaviParam& param, InputBackend* inpu
     NavigationSession session(expanded_param.path, pos);
     session.updatePhase(NaviPhase::Bootstrap, "initial_fix");
 
-    MotionController motion_controller(input_backend, param.enable_local_driver, param.enable_sprint);
+    Motion motion_controller = MakeMotion(input_backend);
+    motion_controller.enable_local_driver = param.enable_local_driver;
+    motion_controller.enable_sprint = param.enable_sprint;
     NavigationStateMachine
         state_machine(expanded_param, input_backend, &position_provider, &session, &motion_controller, &pos, is_stopping, ctx);
 

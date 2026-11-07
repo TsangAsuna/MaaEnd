@@ -162,9 +162,10 @@ bool NavigationStateMachine::climbRecoveryLadder(const NavigateTick& tick, bool 
     const NaviPosition jump_start = *position_;
     LogInfo << "Dynamic recovery jump pulse issued." << VAR(escalation.jump_attempt_count) << VAR(escalation.detour_attempt_count);
     NoteFailure(&failure_trail_, std::chrono::steady_clock::now(), "recovery jump");
-    motion_controller_->setAction(LocalDriverAction::JumpForward, true);
+    ArmSteeringQuietPeriod(motion_controller_);
+    ApplyLocalAction(motion_controller_, LocalDriverAction::JumpForward);
     SleepFor(kActionJumpSettleMs);
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
     if (!captureCurrentPosition(false) || position_provider_->lastCaptureWasBlackScreen() || !position_->valid) {
         LogWarn << "Dynamic recovery waiting for post-jump local tracking fix." << VAR_AS(stalled_ms, tick.stalled_ms)
                 << VAR(escalation.jump_attempt_count);
@@ -249,7 +250,7 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
 
     const double target_heading = CalcTargetRotation(position_->x, position_->y, target->x, target->y);
     const double heading_delta = CalcDeltaRotation(position_->angle, target_heading);
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
     SleepFor(kStopWaitMs);
     int units = static_cast<int>(std::lround(heading_delta * TurnUnitsPerDegree(*input_backend_)));
     if (units == 0) {
@@ -269,7 +270,7 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
             break;
         }
     }
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
     ++unstick.count;
     const bool dislodged = moved >= distance * kUnstickSuccessFraction;
     LogInfo << "Physical unstick step executed." << VAR(distance) << VAR(moved) << VAR(dislodged) << VAR(unstick.count)

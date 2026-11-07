@@ -205,8 +205,7 @@ double AsyncPromptAction::nearestDistanceSq() const
     return nearest_sq;
 }
 
-PromptTriggerOutcome
-    AsyncPromptAction::tryTriggerWhileWalking(MotionController* motion_controller, double waypoint_distance, size_t node_idx)
+PromptTriggerOutcome AsyncPromptAction::tryTriggerWhileWalking(Motion* motion_controller, double waypoint_distance, size_t node_idx)
 {
     if (context_ == nullptr || !started_ || motion_controller == nullptr) {
         return PromptTriggerOutcome::NotTriggered;
@@ -245,7 +244,7 @@ PromptTriggerOutcome
     last_trigger_at_ = now;
     LogInfo << "Async prompt flagged — stopping for authoritative recognition." << VAR(spec_.tag) << VAR(waypoint_distance) << VAR(node_idx)
             << VAR(rec);
-    motion_controller->setForwardState(false);
+    HoldPosition(motion_controller);
     SleepFor(kStopWaitMs);
     if (!RunPromptSubtask(context_, spec_, expected, rec)) {
         // 间隔从识别结束算起, 否则常驻的别家提示会挤掉到点判定

@@ -101,7 +101,7 @@ bool CommitHeadingTurn(const Context& ctx, double heading_delta)
     }
     SleepFor(kWaitAfterFirstTurnMs);
     PulseForwardSync(ctx.input_backend, kPostHeadingForwardPulseMs);
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     SleepFor(kWaitAfterFirstTurnMs);
     return true;
 }
@@ -151,13 +151,13 @@ Result ConsumeHeadingNodes(const Context& ctx)
         const double start_heading = NormalizeAngle(ctx.position->angle);
         const double heading_delta = NormalizeAngle(target_heading - start_heading);
 
-        ctx.motion_controller->setForwardState(false);
+        HoldPosition(ctx.motion_controller);
         SleepFor(kStopWaitMs);
 
         if (std::abs(heading_delta) <= 1.0) {
             LogInfo << "Heading-only node already aligned." << VAR(target_heading) << VAR(start_heading);
             PulseForwardSync(ctx.input_backend, kPostHeadingForwardPulseMs);
-            ctx.motion_controller->setForwardState(false);
+            HoldPosition(ctx.motion_controller);
         }
         else if (!CommitHeadingTurn(ctx, heading_delta)) {
             // 不推进, 下一拍重试

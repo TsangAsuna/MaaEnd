@@ -21,7 +21,7 @@
 namespace mapnavigator
 {
 
-class MotionController;
+struct Motion;
 class PositionProvider;
 class RoiTemplateScanner;
 struct InputBackend;
@@ -45,7 +45,7 @@ public:
         InputBackend* input_backend,
         PositionProvider* position_provider,
         NavigationSession* session,
-        MotionController* motion_controller,
+        Motion* motion_controller,
         NaviPosition* position,
         std::function<bool()> should_stop,
         MaaContext* maa_context);
@@ -162,7 +162,7 @@ private:
     InputBackend* input_backend_;
     PositionProvider* position_provider_;
     NavigationSession* session_;
-    MotionController* motion_controller_;
+    Motion* motion_controller_;
     NaviPosition* position_;
     std::function<bool()> should_stop_;
     MaaContext* maa_context_;
@@ -182,8 +182,8 @@ private:
 
     ObstacleDeviceRecovery device_recovery_;
     std::unique_ptr<RoiTemplateScanner> zipline_mount_scanner_;
-    // 放在最后, 析构时最先执行, 恢复慢跑时用到的成员都还在
     walkmode::Toggle walk_mode_;
+    walkmode::RestoreJogOnExit restore_jog_on_exit_;
 };
 
 } // namespace mapnavigator

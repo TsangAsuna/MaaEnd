@@ -30,7 +30,7 @@ constexpr const char* kTriggerPipelineOverride = "{}";
 
 Result fail_trigger(const Context& ctx, const char* reason, const char* log_message)
 {
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     return {
         .consumed = true,
         .stay_in_current_tick = true,
@@ -81,7 +81,7 @@ Result ProbeTriggerWhileNavigating(const Context& ctx)
     LogInfo << "TRIGGER: node hit on the way, navigation complete." << VAR(waypoint.trigger_node)
             << VAR_AS(ctx.session->current_node_idx(), ctx.session->currentNodeIdx()) << VAR(trigger_idx) << VAR(ctx.position->valid)
             << VAR(remaining);
-    ctx.motion_controller->setForwardState(false);
+    HoldPosition(ctx.motion_controller);
     ctx.session->noteCanonicalFinalGoalConsumed(ctx.session->canonicalIndexAtCurrentPath(trigger_idx), *ctx.position, "trigger_hit");
     ctx.session->skipPastWaypoint(trigger_idx, "trigger_hit");
     ResetOnWaypointAdvance(ctx.runtime_state);

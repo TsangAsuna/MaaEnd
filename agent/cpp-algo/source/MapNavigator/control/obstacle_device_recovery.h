@@ -13,7 +13,7 @@ struct MaaContext;
 namespace mapnavigator
 {
 
-class MotionController;
+struct Motion;
 class PositionProvider;
 class RoiTemplateScanner;
 struct NavigationSession;
@@ -34,7 +34,7 @@ class ObstacleDeviceRecovery
 public:
     ObstacleDeviceRecovery(
         MaaContext* maa_context,
-        MotionController* motion_controller,
+        Motion* motion_controller,
         PositionProvider* position_provider,
         NavigationSession* session,
         NaviPosition* position);
@@ -59,7 +59,7 @@ public:
 
 private:
     MaaContext* maa_context_;
-    MotionController* motion_controller_;
+    Motion* motion_controller_;
     PositionProvider* position_provider_;
     NavigationSession* session_;
     NaviPosition* position_;

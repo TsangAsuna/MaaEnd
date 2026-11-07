@@ -27,7 +27,7 @@ NavigationStateMachine::NavigationStateMachine(
     InputBackend* input_backend,
     PositionProvider* position_provider,
     NavigationSession* session,
-    MotionController* motion_controller,
+    Motion* motion_controller,
     NaviPosition* position,
     std::function<bool()> should_stop,
     MaaContext* maa_context)
@@ -42,7 +42,8 @@ NavigationStateMachine::NavigationStateMachine(
     , collect_prompt_(kCollectPromptSpec, maa_context, session, position)
     , interact_prompt_(kInteractPromptSpec, maa_context, session, position)
     , device_recovery_(maa_context, motion_controller, position_provider, session, position)
-    , walk_mode_(input_backend)
+    , walk_mode_(walkmode::OpenToggle(input_backend))
+    , restore_jog_on_exit_ { walk_mode_ }
 {
     LogInfo << "Navigation route runner selected. backend=orchestrated";
 }
@@ -277,7 +278,7 @@ bool NavigationStateMachine::resumeAfterEscape(const char* reason)
 
 void NavigationStateMachine::stopMotion()
 {
-    motion_controller_->setForwardState(false);
+    HoldPosition(motion_controller_);
 }
 
 bool NavigationStateMachine::failNavigation(

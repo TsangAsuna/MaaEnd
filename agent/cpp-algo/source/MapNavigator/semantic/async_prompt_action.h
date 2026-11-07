@@ -16,7 +16,7 @@ struct MaaContext;
 namespace mapnavigator
 {
 
-class MotionController;
+struct Motion;
 class RoiTemplateScanner;
 struct NavigationSession;
 
@@ -96,7 +96,7 @@ public:
     double nearestDistanceSq() const;
 
     // 非 NotTriggered 表示本拍已用掉, 只有 Recognized 才让路线命名的点算走完
-    PromptTriggerOutcome tryTriggerWhileWalking(MotionController* motion_controller, double waypoint_distance, size_t node_idx);
+    PromptTriggerOutcome tryTriggerWhileWalking(Motion* motion_controller, double waypoint_distance, size_t node_idx);
     // 不节流, 调用方须在路线末尾站定后调用
     bool tryTriggerAtRouteTail();
 

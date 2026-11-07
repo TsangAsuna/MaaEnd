@@ -78,12 +78,12 @@ TickFix NavigationStateMachine::readFix(std::chrono::steady_clock::time_point no
         runtime_state_.flow.navigate_started_at.time_since_epoch().count() > 0
         && std::chrono::duration_cast<std::chrono::milliseconds>(now - runtime_state_.flow.navigate_started_at).count() >= 3000;
     fix.current_heading = NormalizeAngle(position_->angle);
-    fix.drops_turn_sends = motion_controller_->steeringDropsTurnSends();
+    fix.drops_turn_sends = motion_controller_->steering_profile.drops_turn_sends;
     // 站着或刚按前进时小地图箭头跟不上镜头, 这时按镜头朝向转
     fix.arrow_lags_camera = position_->camera_angle.has_value()
                             && std::abs(NormalizeAngle(*position_->camera_angle - position_->angle)) > kSteerArrowLagCameraDeg;
     fix.steering_on_camera =
-        fix.drops_turn_sends && (fix.arrow_lags_camera || (position_->camera_angle.has_value() && !motion_controller_->isMovingForward()));
+        fix.drops_turn_sends && (fix.arrow_lags_camera || (position_->camera_angle.has_value() && !motion_controller_->is_moving_forward));
     fix.steer_heading = fix.steering_on_camera ? NormalizeAngle(*position_->camera_angle) : fix.current_heading;
     fix.degraded_fix = position_provider_->lastCaptureWasBlackScreen() || !position_->valid;
     fix.fix_age_ms = position_->timestamp.time_since_epoch().count() > 0
@@ -105,7 +105,7 @@ void NavigationStateMachine::tickNavRun(NavigateTick& tick)
             nav_run_anchor->first,
             nav_run_anchor->second,
             tick.now,
-            [this] { motion_controller_->setForwardState(false); });
+            [this] { HoldPosition(motion_controller_); });
     }
     if (tick.nav_run_result.planning > std::chrono::steady_clock::duration::zero()) {
         PauseWedge(&runtime_state_.offroute, tick.now);
@@ -165,7 +165,7 @@ TickStep NavigationStateMachine::checkRouteProgress(NavigateTick& tick)
 
     if (!route.valid) {
         if (tick.fix.degraded_fix) {
-            motion_controller_->setForwardState(false);
+            HoldPosition(motion_controller_);
         }
         SleepFor(kTargetTickMs);
         return TickStep::EndTick;
@@ -264,25 +264,25 @@ TickStep NavigationStateMachine::settleAtArrival(const NavigateTick& tick)
         const semantic_nodes::Context semantic_ctx = semanticContext();
         // 这一拍可能已跨过步行带, 所以先停车
         semantic_nodes::StopMotionAndCommitment(semantic_ctx);
-        walk_mode_.request(true);
+        walkmode::RequestWalk(walk_mode_, true);
         const bool settled = semantic_nodes::SettleAtStrictGoal(semantic_ctx, waypoint, should_stop_);
         // 原地转镜头不经过转向环, 转向环记着的待生效转角要清掉
         runtime_state_.steering_rate = {};
         if (should_stop_()) {
-            walk_mode_.request(false);
+            walkmode::RequestWalk(walk_mode_, false);
             return TickStep::EndTick;
         }
         if (!settled) {
             // 定位失效时人可能没到点, 交给丢定位处理
             if (!position_->valid) {
-                walk_mode_.request(false);
+                walkmode::RequestWalk(walk_mode_, false);
                 return EndTickWith(handleLocalizationLoss());
             }
             LogWarn << "Strict arrival correction incomplete; arrival action remains non-fatal."
                     << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx()) << VAR(position_->valid);
         }
     }
-    walk_mode_.request(false);
+    walkmode::RequestWalk(walk_mode_, false);
     return TickStep::Next;
 }
 
