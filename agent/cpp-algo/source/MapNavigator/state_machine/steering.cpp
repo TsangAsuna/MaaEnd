@@ -31,7 +31,7 @@ double NavigationStateMachine::steerAlongCorridor(const NavigateTick& tick)
     const auto [heading_rate_deg, heading_rate_raw_delta_deg, heading_rate_gap_ms, heading_rate_gap_ticks] = reading.heading_rate;
     const uint64_t tick_seq = runtime_state_.flow.tick_seq;
 
-    const double heading_error = NaviMath::normalizeAngle(effective_route_heading - fix.steer_heading);
+    const double heading_error = NormalizeAngle(effective_route_heading - fix.steer_heading);
     const SteeringCommand steering = steering_loop.decide(heading_error, heading_rate_deg);
 
     // 慢循环里大转角要晚一拍才落地, 原地转免得冲过弯

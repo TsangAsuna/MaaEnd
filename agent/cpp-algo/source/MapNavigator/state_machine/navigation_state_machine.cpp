@@ -252,7 +252,7 @@ TickStep NavigationStateMachine::finishNavigateTick(const NavigateTick& tick)
             "no_progress_timeout",
             "No progress timeout reached and navigation was terminated.",
             tick.route.progress_distance,
-            NaviMath::normalizeAngle(tick.route.route_heading - tick.fix.current_heading),
+            NormalizeAngle(tick.route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
     }
 

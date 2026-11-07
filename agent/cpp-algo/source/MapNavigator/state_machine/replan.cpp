@@ -135,7 +135,7 @@ bool NavigationStateMachine::tryVirtualNoGoReplan(
 {
     std::vector<VirtualNoGoDisc>& discs = runtime_state_.virtual_no_go;
     // 朝向是罗盘角: 0 朝上, 顺时针
-    const double rad = NaviMath::normalizeHeading(stuck_heading) * kPi / 180.0;
+    const double rad = NormalizeHeading(stuck_heading) * kPi / 180.0;
     const double dir_x = std::sin(rad);
     const double dir_y = -std::cos(rad);
     // 圆心放在卡死点前方再让出 standoff, 卡死点本身不进禁区

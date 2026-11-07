@@ -780,7 +780,7 @@ bool try_append_zipline_leg(
         ZiplineHopPlan hop_plan;
         hop_plan.mount = from_ref;
         hop_plan.landing = to_ref;
-        hop_plan.planned_elevation_deg = NaviMath::calcElevation(from_ref, to_ref);
+        hop_plan.planned_elevation_deg = CalcElevation(from_ref, to_ref);
         if (hop == 0) {
             for (const navmesh::WorldPoint& spot : route->mount_spots) {
                 hop_plan.mount_spots.push_back(ZiplineMountSpot { .x = spot.x, .y = spot.y });

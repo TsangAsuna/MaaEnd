@@ -65,7 +65,7 @@ TickStep NavigationStateMachine::checkOffRouteWedge(const NavigateTick& tick)
             "offroute_wedge_timeout",
             "Off-route with no route progress past the wedge timeout; terminating so the pipeline can retry.",
             route.progress_distance,
-            NaviMath::normalizeAngle(route.route_heading - tick.fix.current_heading),
+            NormalizeAngle(route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
     }
     const bool replan_cooling =
@@ -125,7 +125,7 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
             "dynamic_recovery_timeout",
             "Dynamic recovery timeout reached and navigation was terminated.",
             route.progress_distance,
-            NaviMath::normalizeAngle(route.route_heading - tick.fix.current_heading),
+            NormalizeAngle(route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
     }
 
@@ -257,8 +257,8 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
         return false;
     }
 
-    const double target_heading = NaviMath::calcTargetRotation(position_->x, position_->y, target->x, target->y);
-    const double heading_delta = NaviMath::calcDeltaRotation(position_->angle, target_heading);
+    const double target_heading = CalcTargetRotation(position_->x, position_->y, target->x, target->y);
+    const double heading_delta = CalcDeltaRotation(position_->angle, target_heading);
     motion_controller_->setForwardState(false);
     SleepFor(kStopWaitMs);
     int units = static_cast<int>(std::lround(heading_delta * action_wrapper_->defaultTurnUnitsPerDegree()));

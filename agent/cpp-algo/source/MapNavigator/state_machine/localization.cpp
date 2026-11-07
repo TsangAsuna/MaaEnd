@@ -339,7 +339,7 @@ bool NavigationStateMachine::armRiverFallRecoveryIfBlackScreenLoss(const char* v
     if (!runtime_state_.localization_loss.saw_black_screen) {
         return false;
     }
-    runtime_state_.river_fall.arm(*position_, NaviMath::normalizeAngle(position_->angle));
+    runtime_state_.river_fall.arm(*position_, NormalizeAngle(position_->angle));
     // 落水前的卡死恢复已经过时, 留着会抢在上岸流程前面
     runtime_state_.recovery.reset();
     session_->resetHardProgress();
@@ -360,7 +360,7 @@ TickStep NavigationStateMachine::runRiverFallRecovery(const NavigateTick& tick)
             "river_fall_recovery_timeout",
             "River-fall recovery made no net progress past the timeout; terminating navigation.",
             route.progress_distance,
-            NaviMath::normalizeAngle(route.route_heading - tick.fix.current_heading),
+            NormalizeAngle(route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
     }
     RiverFallRecovery recovery(runtime_state_.river_fall, action_wrapper_, motion_controller_, position_);

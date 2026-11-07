@@ -101,8 +101,7 @@ std::optional<SegmentProjection>
     projection.cross_track_distance = std::hypot(position.x - projected_x, position.y - projected_y);
     projection.current_distance = std::hypot(from.x - position.x, from.y - position.y);
     projection.next_distance = std::hypot(to.x - position.x, to.y - position.y);
-    projection.turn_back_yaw =
-        std::abs(NaviMath::normalizeAngle(NaviMath::calcTargetRotation(position.x, position.y, from.x, from.y) - position.angle));
+    projection.turn_back_yaw = std::abs(NormalizeAngle(CalcTargetRotation(position.x, position.y, from.x, from.y) - position.angle));
     return projection;
 }
 
@@ -220,7 +219,7 @@ RouteMeasurement RouteTracker::update(NavigationSession* session, RouteTrackerSt
     tracking.arrival_band = waypoint.arrivalBand(tracking_position_quantum());
     tracking.waypoint_distance = std::hypot(waypoint.x - position.x, waypoint.y - position.y);
     tracking.progress_distance = tracking.waypoint_distance;
-    tracking.waypoint_heading = NaviMath::calcTargetRotation(position.x, position.y, waypoint.x, waypoint.y);
+    tracking.waypoint_heading = CalcTargetRotation(position.x, position.y, waypoint.x, waypoint.y);
     tracking.route_heading = tracking.waypoint_heading;
     if (!waypoint.isContinuousRun()) {
         return tracking;

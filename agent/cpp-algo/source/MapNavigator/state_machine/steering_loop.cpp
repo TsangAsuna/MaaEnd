@@ -56,10 +56,10 @@ SteeringLoop::TurnObservation SteeringLoop::observeLastTurn(double steer_heading
     if (!steering_rate_.has_cmd) {
         return {};
     }
-    const double achieved_deg = NaviMath::normalizeAngle(steer_heading - steering_rate_.cmd_heading_deg);
+    const double achieved_deg = NormalizeAngle(steer_heading - steering_rate_.cmd_heading_deg);
     return {
         .achieved_deg = achieved_deg,
-        .residual_deg = NaviMath::normalizeAngle(achieved_deg - steering_rate_.cmd_delta_deg),
+        .residual_deg = NormalizeAngle(achieved_deg - steering_rate_.cmd_delta_deg),
         .elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - steering_rate_.cmd_at).count(),
     };
 }
@@ -76,7 +76,7 @@ SteeringLoop::HeadingRate SteeringLoop::trackHeadingRate(double steer_heading, s
         return {};
     }
     HeadingRate rate;
-    rate.raw_delta_deg = NaviMath::normalizeAngle(steer_heading - steering_rate.prev_heading_deg);
+    rate.raw_delta_deg = NormalizeAngle(steer_heading - steering_rate.prev_heading_deg);
     rate.gap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - steering_rate.at).count();
     rate.gap_ticks = tick_seq - steering_rate.at_tick;
     const bool heading_changed = std::abs(rate.raw_delta_deg) > kSteeringHeadingChangeEpsilonDeg;
@@ -132,7 +132,7 @@ void SteeringLoop::settlePendingTurn(
                 steering_rate.pending_turn_deg = 0.0;
             }
             else {
-                const double landed = NaviMath::normalizeAngle(steer_heading - steering_rate.pending_ref_heading_deg);
+                const double landed = NormalizeAngle(steer_heading - steering_rate.pending_ref_heading_deg);
                 const double owed = std::abs(steering_rate.pending_turn_deg);
                 double negative_sent_deg = 0.0;
                 double positive_sent_deg = 0.0;
@@ -150,7 +150,7 @@ void SteeringLoop::settlePendingTurn(
             steering_rate.pending_turn_deg = 0.0;
         }
         else {
-            const double landed = NaviMath::normalizeAngle(steer_heading - steering_rate.pending_ref_heading_deg);
+            const double landed = NormalizeAngle(steer_heading - steering_rate.pending_ref_heading_deg);
             const double owed = std::abs(steering_rate.pending_turn_deg);
             steering_rate.pending_turn_deg = std::clamp(steering_rate.pending_turn_deg - landed, -owed, owed);
         }
