@@ -65,7 +65,7 @@ void NavigationStateMachine::trackRoute(NavigateTick& tick)
     const size_t node_idx_before_tracking = session_->currentNodeIdx();
     tick.route = RouteTracker::update(session_, &runtime_state_.route, *position_);
     if (session_->currentNodeIdx() != node_idx_before_tracking) {
-        runtime_state_.recovery.reset();
+        runtime_state_.recovery = {};
     }
     tickNavRun(tick);
     consumeCorridorPassedWaypoints(tick);
@@ -108,7 +108,7 @@ void NavigationStateMachine::tickNavRun(NavigateTick& tick)
             [this] { motion_controller_->setForwardState(false); });
     }
     if (tick.nav_run_result.planning > std::chrono::steady_clock::duration::zero()) {
-        runtime_state_.offroute.pauseAt(tick.now);
+        PauseWedge(&runtime_state_.offroute, tick.now);
         session_->excludeFromStallClocks(tick.nav_run_result.planning);
         tick.now += tick.nav_run_result.planning;
     }
@@ -125,7 +125,7 @@ void NavigationStateMachine::consumeCorridorPassedWaypoints(NavigateTick& tick)
     if (consumed == 0) {
         return;
     }
-    runtime_state_.recovery.reset();
+    runtime_state_.recovery = {};
     runtime_state_.global_reacquire_streak = 0;
     tick.route = RouteTracker::update(session_, &runtime_state_.route, *position_);
 }
@@ -139,7 +139,7 @@ TickStep NavigationStateMachine::checkRouteProgress(NavigateTick& tick)
     if (runtime_state_.cross_tier_escape.active && session_->hardStalledMs(tick.now) >= kCrossTierEscapeHardStallMs) {
         const double goal_dist =
             std::hypot(position_->x - runtime_state_.cross_tier_escape.goal_x, position_->y - runtime_state_.cross_tier_escape.goal_y);
-        runtime_state_.cross_tier_escape.reset();
+        runtime_state_.cross_tier_escape = {};
         return EndTickWith(failNavigation(
             "crosstier_escape_stalled",
             "Cross-tier escape made no corridor progress (walled or unfollowable); terminating so the pipeline can retry.",
@@ -215,14 +215,14 @@ double NavigationStateMachine::resolveArrivalDistance(const NavigateTick& tick)
         }
         arrival_distance = std::max(arrival_distance, relaxed);
     }
-    if (waypoint.action == ActionType::ZIPLINE && !runtime_state_.isZiplineMounted()
+    if (waypoint.action == ActionType::ZIPLINE && !IsZiplineMounted(runtime_state_)
         && session_->hardStalledMs(tick.now) <= kCollectArrivalRelaxMs) {
         arrival_distance = std::min(arrival_distance, kCollectArrivalBandWu);
         if (runtime_state_.zipline_approach.press_missed) {
             arrival_distance = std::min(arrival_distance, kZiplineRestandBandWu);
         }
     }
-    if (IsAsyncInteract(waypoint) && runtime_state_.interact_approach.promptMissedAt(session_->currentAbsoluteNodeIndex())
+    if (IsAsyncInteract(waypoint) && PromptMissedAt(runtime_state_.interact_approach, session_->currentAbsoluteNodeIndex())
         && tick.now - runtime_state_.interact_approach.missed_at <= std::chrono::milliseconds(kCollectArrivalRelaxMs)) {
         arrival_distance = std::min(arrival_distance, kStrictSettleAcceptBandWu);
     }
@@ -267,7 +267,7 @@ TickStep NavigationStateMachine::settleAtArrival(const NavigateTick& tick)
         walk_mode_.request(true);
         const bool settled = semantic_nodes::SettleAtStrictGoal(semantic_ctx, waypoint, should_stop_);
         // 原地转镜头不经过转向环, 转向环记着的待生效转角要清掉
-        runtime_state_.steering_rate.reset();
+        runtime_state_.steering_rate = {};
         if (should_stop_()) {
             walk_mode_.request(false);
             return TickStep::EndTick;

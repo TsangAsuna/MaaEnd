@@ -69,12 +69,12 @@ bool reached_arrive_point(const Context& ctx, const Waypoint& waypoint)
 void leave_find_phase(const Context& ctx)
 {
     ctx.motion_controller->setForwardState(false);
-    ctx.runtime_state->resetNavigationAssistState();
+    ResetNavigationAssistState(ctx.runtime_state);
     ctx.runtime_state->flow.motionless_hold_ticks = 0;
     ctx.runtime_state->flow.futile_forward_reasserts = 0;
     ctx.position_provider->resetTracking();
     ctx.session->resetProgress();
-    ctx.runtime_state->find.reset();
+    ctx.runtime_state->find = {};
 }
 
 // consumed 也要置位, 走路探测靠它把失败转给 TickFindTarget
@@ -127,7 +127,7 @@ Result begin_find(const Context& ctx, const char* reason)
     SleepFor(kStopWaitMs);
 
     FindState& find = ctx.runtime_state->find;
-    find.reset();
+    find = {};
     find.started_at = std::chrono::steady_clock::now();
     ctx.session->updatePhase(NaviPhase::WaitFind, reason);
 

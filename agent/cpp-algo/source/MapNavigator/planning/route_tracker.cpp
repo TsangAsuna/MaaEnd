@@ -126,13 +126,13 @@ void advance_passed_run_waypoints(
         const size_t current_idx = session->currentNodeIdx();
         const std::optional<SegmentProjection> segment = project_onto_serial_route_segment(session->currentPath(), current_idx, position);
         if (!segment.has_value()) {
-            state->resetTracking();
+            ResetRouteTracking(state);
             break;
         }
 
         const bool same_segment = state->last_segment_from_idx == segment->from_idx && state->last_segment_to_idx == segment->to_idx;
         if (!same_segment) {
-            state->resetTracking();
+            ResetRouteTracking(state);
         }
         state->last_segment_from_idx = segment->from_idx;
         state->last_segment_to_idx = segment->to_idx;
@@ -162,7 +162,7 @@ void advance_passed_run_waypoints(
         const bool latched_for_current = state->passed_waypoint_latched && state->passed_waypoint_idx == current_idx;
         if (!latched_for_current) {
             if (segment->cross_track_distance > kSerialRouteDeviationFailThreshold) {
-                state->resetTracking();
+                ResetRouteTracking(state);
             }
             break;
         }
@@ -171,7 +171,7 @@ void advance_passed_run_waypoints(
             break;
         }
 
-        state->resetTracking();
+        ResetRouteTracking(state);
         session->advanceToNextWaypoint(ActionType::RUN, "passed_waypoint_advance");
     }
 }

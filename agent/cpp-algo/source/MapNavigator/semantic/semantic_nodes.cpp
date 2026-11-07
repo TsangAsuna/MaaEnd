@@ -34,7 +34,7 @@ Result arrive_transfer(const Context& ctx, const std::optional<size_t>& node_idx
     StopMotionAndCommitment(ctx);
     ctx.session->noteCanonicalFinalGoalConsumed(node_idx, *ctx.position, "transfer_wait_started");
     ctx.session->advanceToNextWaypoint(ActionType::TRANSFER, "transfer_wait_started");
-    ctx.runtime_state->onWaypointAdvance();
+    ResetOnWaypointAdvance(ctx.runtime_state);
     const auto now = std::chrono::steady_clock::now();
     const bool waits = ctx.session->hasCurrentWaypoint();
     ctx.runtime_state->semantic.transfer = waits ? TransferWaitState { .started = now, .anchor = *ctx.position } : TransferWaitState {};
@@ -54,7 +54,7 @@ Result arrive_portal(const Context& ctx, const std::optional<size_t>& node_idx, 
 {
     ctx.session->noteCanonicalFinalGoalConsumed(node_idx, *ctx.position, "portal_entered");
     ctx.session->advanceToNextWaypoint(ActionType::PORTAL, "portal_entered");
-    ctx.runtime_state->onWaypointAdvance();
+    ResetOnWaypointAdvance(ctx.runtime_state);
     const auto now = std::chrono::steady_clock::now();
     ctx.runtime_state->semantic.portal = ctx.session->hasCurrentWaypoint()
                                              ? PortalTransitState { .phase = PortalTransitPhase::AwaitZone, .started = now }
@@ -83,7 +83,7 @@ Result arrive_dig(const Context& ctx, const Waypoint& waypoint, const std::optio
 
     LogInfo << "Action: DIG subtask returned." << VAR(sub_id);
     SleepFor(kDigPostSleepMs);
-    ctx.runtime_state->route.reset();
+    ctx.runtime_state->route = {};
     return CompleteArrival(ctx, waypoint, node_idx, "dig_completed");
 }
 
@@ -93,8 +93,8 @@ Result walk_on_after_prompt_miss(const Context& ctx, const std::optional<size_t>
     approach.prompt_missed_node = node_idx;
     approach.missed_at = std::chrono::steady_clock::now();
     // 起步按已确认算, 否则要先挪够起步距离才放行到点判定
-    ctx.runtime_state->route.reset();
-    ctx.runtime_state->route.confirmStartupAt(*ctx.position);
+    ctx.runtime_state->route = {};
+    ConfirmStartupAt(&ctx.runtime_state->route, *ctx.position);
     ctx.session->resetHardProgress();
     LogInfo << "Action: INTERACT prompt missed, walking on onto the point." << VAR(actual_distance) << VAR(*node_idx);
     return { .consumed = true };
@@ -106,11 +106,11 @@ Result arrive_async_interact(const Context& ctx, const Waypoint& waypoint, const
     LogInfo << "Action: INTERACT reached, running the authoritative recognition." << VAR(actual_distance)
             << VAR(waypoint.interact_text.size()) << VAR(waypoint.interact_scan) << VAR(waypoint.interact_rec);
     const bool recognized = RunPromptSubtask(ctx.maa_context, kInteractPromptSpec, &waypoint.interact_text, waypoint.interact_rec);
-    if (!recognized && waypoint.has_position && node_idx && !ctx.runtime_state->interact_approach.promptMissedAt(node_idx)
+    if (!recognized && waypoint.has_position && node_idx && !PromptMissedAt(ctx.runtime_state->interact_approach, node_idx)
         && actual_distance > kStrictSettleAcceptBandWu) {
         return walk_on_after_prompt_miss(ctx, node_idx, actual_distance);
     }
-    ctx.runtime_state->route.reset();
+    ctx.runtime_state->route = {};
     if (!recognized && waypoint.interact_rec) {
         LogWarn << "Action: INTERACT prompt still missing in rec mode." << VAR(actual_distance) << VAR(waypoint.interact_text_node);
         return Failure("interact_prompt_missing", "Interact prompt not recognized on the point.");
@@ -139,7 +139,7 @@ Result arrive_key_interact(const Context& ctx, const Waypoint& waypoint, const s
         LogInfo << "Action: INTERACT in rec mode, skipping the key press." << VAR(waypoint.interact_text_node);
     }
     else {
-        ctx.runtime_state->armCameraAlign();
+        ArmCameraAlign(ctx.runtime_state);
         ctx.action_executor->interact();
     }
     return CompleteArrival(ctx, waypoint, node_idx, "waypoint_action_completed");
@@ -243,11 +243,11 @@ Result HandleArrival(const Context& ctx, const Waypoint& waypoint, double actual
         ctx.action_executor->sprint();
         break;
     case ActionType::JUMP:
-        ctx.runtime_state->armCameraAlign();
+        ArmCameraAlign(ctx.runtime_state);
         ctx.action_executor->jump();
         break;
     case ActionType::FIGHT:
-        ctx.runtime_state->armCameraAlign();
+        ArmCameraAlign(ctx.runtime_state);
         ctx.action_executor->fight();
         break;
     // HEADING/ZONE 没坐标, NAVMESH 展开后换成规划点, 实际到不了这里

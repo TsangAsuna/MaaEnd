@@ -108,7 +108,7 @@ Result ArriveJumpPad(const Context& ctx, const Waypoint& waypoint, const std::op
     StopMotionAndCommitment(ctx);
     ctx.session->noteCanonicalFinalGoalConsumed(node_idx, *ctx.position, "jump_pad_reached");
     ctx.session->advanceToNextWaypoint(ActionType::JUMP_PAD, "jump_pad_reached");
-    ctx.runtime_state->onWaypointAdvance();
+    ResetOnWaypointAdvance(ctx.runtime_state);
 
     JumpPadState& state = ctx.runtime_state->semantic.jump_pad;
     state = {};

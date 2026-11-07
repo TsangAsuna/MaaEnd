@@ -140,7 +140,7 @@ bool NavigationStateMachine::endLocalizationLoss()
 {
     LocalizationLossState& loss = runtime_state_.localization_loss;
     if (loss.started_at == std::chrono::steady_clock::time_point {}) {
-        loss.reset();
+        loss = {};
         return false;
     }
     const auto loss_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - loss.started_at).count();
@@ -148,7 +148,7 @@ bool NavigationStateMachine::endLocalizationLoss()
     LogInfo << "Localization recovered via normal tracking." << VAR(loss_ms) << VAR(loss.saw_black_screen) << VAR(armed)
             << VAR(position_->x) << VAR(position_->y);
     failure_trail_.note(std::chrono::steady_clock::now(), "localization recovered", loss_ms);
-    loss.reset();
+    loss = {};
     return armed;
 }
 
@@ -162,7 +162,7 @@ TickStep NavigationStateMachine::checkDwellWatchdog()
         LogWarn << "Dwell watchdog tripped at a zipline tower; dropping the chain and walking." << VAR(runtime_state_.dwell.dwell_ms)
                 << VAR(position_->x) << VAR(position_->y);
         semantic_nodes::AbandonZipline(semanticContext(), "zipline_dwell_watchdog", "never left the tower's dwell radius");
-        runtime_state_.dwell.reset();
+        runtime_state_.dwell = {};
         return TickStep::EndTick;
     }
     LogError << "Dwell watchdog tripped; the agent never left its dwell radius." << VAR(runtime_state_.dwell.dwell_ms)
@@ -185,7 +185,7 @@ bool NavigationStateMachine::handleLocalizationLoss()
         loss.last_fix = *position_;
         failure_trail_.note(now, "localization lost");
     }
-    runtime_state_.offroute.pauseAt(now);
+    PauseWedge(&runtime_state_.offroute, now);
     // 丢定位期间截到黑屏就是落水了
     if (position_provider_->lastCaptureWasBlackScreen()) {
         loss.saw_black_screen = true;
@@ -294,15 +294,15 @@ bool NavigationStateMachine::resumeAfterGlobalReacquire(const std::string& prior
             if (zone_changed) {
                 session_->updateCurrentZone(position_->zone_id);
             }
-            loss.reset();
+            loss = {};
             return true;
         }
         LogInfo << "Cross-tier escape: re-acquired zone left the pit span; reverting to loss handling." << VAR(prior_zone)
                 << VAR(position_->zone_id);
-        runtime_state_.cross_tier_escape.reset();
+        runtime_state_.cross_tier_escape = {};
     }
     else if (zone_changed && tryEnterCrossTierEscape()) {
-        loss.reset();
+        loss = {};
         return true;
     }
 
@@ -327,8 +327,8 @@ bool NavigationStateMachine::resumeAfterGlobalReacquire(const std::string& prior
             << VAR(dropped_frames);
     failure_trail_.note(std::chrono::steady_clock::now(), "localization reacquired globally", loss_elapsed.count());
     armRiverFallRecoveryIfBlackScreenLoss("global_reacquire");
-    loss.reset();
-    runtime_state_.route.resetTracking();
+    loss = {};
+    ResetRouteTracking(&runtime_state_.route);
     runtime_state_.nav_run_dirty = true;
     session_->resetProgress();
     return true;
@@ -339,9 +339,9 @@ bool NavigationStateMachine::armRiverFallRecoveryIfBlackScreenLoss(const char* v
     if (!runtime_state_.localization_loss.saw_black_screen) {
         return false;
     }
-    runtime_state_.river_fall.arm(*position_, NormalizeAngle(position_->angle));
+    ArmRiverFallRecovery(&runtime_state_.river_fall, *position_, NormalizeAngle(position_->angle));
     // 落水前的卡死恢复已经过时, 留着会抢在上岸流程前面
-    runtime_state_.recovery.reset();
+    runtime_state_.recovery = {};
     session_->resetHardProgress();
     LogInfo << "River-fall recovery armed (black-screen loss recovered)." << VAR(via) << VAR(position_->x) << VAR(position_->y)
             << VAR(runtime_state_.river_fall.water_heading);
@@ -354,7 +354,7 @@ TickStep NavigationStateMachine::runRiverFallRecovery(const NavigateTick& tick)
         return TickStep::Next;
     }
     const RouteMeasurement& route = tick.route;
-    runtime_state_.offroute.pauseAt(tick.now);
+    PauseWedge(&runtime_state_.offroute, tick.now);
     if (session_->hardStalledMs(tick.now) > kRiverFallRecoveryTimeoutMs) {
         return EndTickWith(failNavigation(
             "river_fall_recovery_timeout",
@@ -387,7 +387,7 @@ bool NavigationStateMachine::tryEnterCrossTierEscape()
     if (!planCrossTierEscapeCorridorFromHere("crosstier_escape")) {
         return false;
     }
-    runtime_state_.cross_tier_escape.engage(position_->zone_id);
+    EngageCrossTierEscape(&runtime_state_.cross_tier_escape, position_->zone_id);
     session_->resetHardProgress();
     LogInfo << "Cross-tier escape engaged: routing out of a wrong tier via navmesh." << VAR(position_->zone_id) << VAR(position_->x)
             << VAR(position_->y) << VAR(runtime_state_.cross_tier_escape.goal_x) << VAR(runtime_state_.cross_tier_escape.goal_y);
@@ -431,7 +431,7 @@ void NavigationStateMachine::endCrossTierEscapeAtRejoin()
     if (distance_to_goal <= kCrossTierEscapeArrivalM && on_floorless_zone) {
         LogInfo << "Cross-tier escape reached the rejoin point on the base floor; resuming authored route." << VAR(distance_to_goal)
                 << VAR(position_->zone_id) << VAR(position_->x) << VAR(position_->y);
-        runtime_state_.cross_tier_escape.reset();
+        runtime_state_.cross_tier_escape = {};
     }
 }
 

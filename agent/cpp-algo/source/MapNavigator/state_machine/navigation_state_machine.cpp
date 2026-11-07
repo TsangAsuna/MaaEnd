@@ -234,7 +234,7 @@ TickStep NavigationStateMachine::runInlineSemantics()
 
 TickStep NavigationStateMachine::idleWhileNotWalking()
 {
-    if (runtime_state_.semantic.portal.active() || session_->phase() != NaviPhase::Navigate) {
+    if (IsPortalTransitActive(runtime_state_.semantic.portal) || session_->phase() != NaviPhase::Navigate) {
         SleepFor(kTargetTickMs);
         return TickStep::EndTick;
     }
@@ -269,9 +269,9 @@ bool NavigationStateMachine::resumeAfterEscape(const char* reason)
 {
     runtime_state_.flow.futile_forward_reasserts = 0;
     runtime_state_.flow.motionless_hold_ticks = 0;
-    runtime_state_.recovery.reset();
-    runtime_state_.recovery_escalation.reset();
-    runtime_state_.route.resetTracking();
+    runtime_state_.recovery = {};
+    runtime_state_.recovery_escalation = {};
+    ResetRouteTracking(&runtime_state_.route);
     runtime_state_.dynamic_replan_requested = false;
     runtime_state_.nav_run_dirty = true;
     session_->resetProgress();
@@ -292,7 +292,7 @@ bool NavigationStateMachine::failNavigation(
     int64_t stalled_ms)
 {
     stopMotion();
-    runtime_state_.resetNavigationAssistState();
+    ResetNavigationAssistState(&runtime_state_);
     session_->updatePhase(NaviPhase::Failed, reason);
     failure_trail_.log(std::chrono::steady_clock::now());
     LogError << log_message << VAR(current_distance) << VAR(yaw_error) << VAR(stalled_ms);

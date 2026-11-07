@@ -28,7 +28,7 @@ RiverFallRecovery::Step RiverFallRecovery::advance(double current_heading)
     RiverFallRecoveryState& rf = state_;
     const double rf_displacement = std::hypot(position_->x - rf.anchor_pos.x, position_->y - rf.anchor_pos.y);
     if (rf_displacement >= kRiverFallRecoveryClearDistance) {
-        rf.reset();
+        rf = {};
         LogInfo << "River-fall recovery cleared; resuming navigation." << VAR(rf_displacement) << VAR(current_heading);
         return Step::Cleared;
     }

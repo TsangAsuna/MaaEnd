@@ -42,7 +42,7 @@ Result finalize_portal_transit_zone(const Context& ctx, const std::string& zone_
     }
     ctx.session->updateCurrentZone(zone_id);
     ctx.session->resetProgress();
-    ctx.runtime_state->onWaypointAdvance();
+    ResetOnWaypointAdvance(ctx.runtime_state);
     ConsumeMatchedZoneNodes(ctx);
     StopMotionAndCommitment(ctx);
     ctx.position_provider->resetTracking();
@@ -56,7 +56,7 @@ Result finalize_portal_transit_zone(const Context& ctx, const std::string& zone_
 Result TickPortalTransit(const Context& ctx)
 {
     PortalTransitState& portal = ctx.runtime_state->semantic.portal;
-    if (!portal.active()) {
+    if (!IsPortalTransitActive(portal)) {
         return {};
     }
 

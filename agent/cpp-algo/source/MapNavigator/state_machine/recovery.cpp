@@ -42,41 +42,30 @@ TickStep NavigationStateMachine::checkOffRouteWedge(const NavigateTick& tick)
     const bool watched = session_->phase() == NaviPhase::Navigate && IsContinuousRun(tick.waypoint) && !route.on_route
                          && std::isfinite(route.cross_track) && !runtime_state_.cross_tier_escape.active;
     if (!watched) {
-        runtime_state_.offroute.reset();
+        runtime_state_.offroute = {};
         return TickStep::Next;
     }
-    OffRouteWedgeState& wedge = runtime_state_.offroute;
-    if (const int64_t blind_ms = wedge.resumeAt(tick.now); blind_ms > 0) {
+    if (const int64_t blind_ms = ResumeWedge(&runtime_state_.offroute, tick.now); blind_ms > 0) {
         LogInfo << "Off-route wedge clock resumed after a blind stretch." << VAR(blind_ms) << VAR(route.progress_distance)
-                << VAR(wedge.best_distance);
+                << VAR(runtime_state_.offroute.best_distance);
     }
-    const double progress_epsilon = std::max(kNoProgressDistanceEpsilon, kMeasurementDefaultPositionQuantum);
-    const bool retaking_baseline = wedge.active && !wedge.hasBaseline();
-    if (!wedge.active || retaking_baseline || route.progress_distance + progress_epsilon < wedge.best_distance) {
-        wedge.active = true;
-        wedge.best_distance = route.progress_distance;
-        if (!retaking_baseline) {
-            wedge.since = tick.now;
-        }
-    }
-    const int64_t wedge_ms = std::chrono::duration_cast<std::chrono::milliseconds>(tick.now - wedge.since).count();
-    if (wedge_ms >= kOffRouteWedgeFailMs) {
+    switch (StepWedge(&runtime_state_.offroute, route.progress_distance, tick.now)) {
+    case WedgeAction::None:
+        return TickStep::Next;
+    case WedgeAction::Fail:
         return EndTickWith(failNavigation(
             "offroute_wedge_timeout",
             "Off-route with no route progress past the wedge timeout; terminating so the pipeline can retry.",
             route.progress_distance,
             NormalizeAngle(route.route_heading - tick.fix.current_heading),
             tick.stalled_ms));
-    }
-    const bool replan_cooling =
-        wedge.last_replan_at.time_since_epoch().count() > 0
-        && std::chrono::duration_cast<std::chrono::milliseconds>(tick.now - wedge.last_replan_at).count() < kOffRouteWedgeReplanCooldownMs;
-    if (wedge_ms >= kOffRouteWedgeReplanMs && !replan_cooling) {
-        wedge.last_replan_at = tick.now;
+    case WedgeAction::Replan: {
+        const int64_t wedge_ms = ElapsedMs(runtime_state_.offroute.since, tick.now);
         LogWarn << "Off-route wedge detected; replanning from current position." << VAR(wedge_ms) << VAR(route.waypoint_distance)
                 << VAR(route.cross_track) << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx());
         handleDynamicReplanRequest("offroute_wedge");
         return TickStep::EndTick;
+    }
     }
     return TickStep::Next;
 }
@@ -102,11 +91,11 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
     DynamicRecoveryState& recovery = runtime_state_.recovery;
     RecoveryEscalationState& escalation = runtime_state_.recovery_escalation;
     if (!recovery.active || recovery.anchor_index != anchor->first) {
-        recovery.restart(*position_, tick.now, anchor->first);
+        RestartDynamicRecovery(&recovery, *position_, anchor->first, tick.now);
     }
     if (escalation.anchor_index != anchor->first) {
         const bool fought_another_anchor = escalation.anchor_index != std::numeric_limits<size_t>::max();
-        escalation.retarget(anchor->first);
+        RetargetRecoveryEscalation(&escalation, anchor->first);
         if (fought_another_anchor) {
             device_recovery_.forgetObservation();
         }
@@ -160,7 +149,7 @@ bool NavigationStateMachine::climbRecoveryLadder(const NavigateTick& tick, bool 
     }
     if (device_outcome == DeviceRemovalOutcome::UnknownUi) {
         const auto cleanup_started_at = std::chrono::steady_clock::now();
-        runtime_state_.offroute.pauseAt(cleanup_started_at);
+        PauseWedge(&runtime_state_.offroute, cleanup_started_at);
         if (!returnToWorld()) {
             return true;
         }
@@ -207,11 +196,11 @@ bool NavigationStateMachine::escalatePastJump(const NavigateTick& tick)
         return true;
     }
     if (post_jump_anchor->first != recovery.anchor_index) {
-        recovery.restart(*position_, tick.now, post_jump_anchor->first);
+        RestartDynamicRecovery(&recovery, *position_, post_jump_anchor->first, tick.now);
         recovery.last_replan_at = tick.now;
     }
     if (post_jump_anchor->first != escalation.anchor_index) {
-        escalation.retarget(post_jump_anchor->first);
+        RetargetRecoveryEscalation(&escalation, post_jump_anchor->first);
         escalation.jump_attempt_count = 1;
     }
 
@@ -243,10 +232,10 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
 {
     LateralBypassState& unstick = runtime_state_.bypass;
     if (unstick.active && std::hypot(position_->x - unstick.origin.x, position_->y - unstick.origin.y) > kUnstickResetDistanceM) {
-        unstick.reset();
+        unstick = {};
     }
     if (!unstick.active) {
-        unstick.beginAt(*position_);
+        BeginLateralBypass(&unstick, *position_);
     }
 
     double distance = kUnstickMinDistanceM;
@@ -296,7 +285,7 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
         selectPhaseForCurrentWaypoint("recovery_unstick_replan");
         return true;
     }
-    runtime_state_.route.resetTracking();
+    ResetRouteTracking(&runtime_state_.route);
     runtime_state_.dynamic_replan_requested = false;
     runtime_state_.nav_run_dirty = true;
     session_->resetProgress();

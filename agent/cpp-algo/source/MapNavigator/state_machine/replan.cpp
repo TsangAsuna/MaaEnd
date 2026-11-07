@@ -36,7 +36,7 @@ auto with_planning_pause(MotionController* motion, NavigationRuntimeState* runti
 {
     const auto started_at = std::chrono::steady_clock::now();
     motion->setForwardState(false);
-    runtime->offroute.pauseAt(started_at);
+    PauseWedge(&runtime->offroute, started_at);
     auto result = plan();
     session->excludeFromStallClocks(std::chrono::steady_clock::now() - started_at);
     return result;
@@ -101,11 +101,11 @@ bool NavigationStateMachine::tryApplyDynamicOverlayToAnchor(
     }
     const size_t generated_count = generated_prefix.size();
     session_->applyDynamicOverlay(std::move(generated_prefix), continue_index, *position_);
-    runtime_state_.route.reset();
-    runtime_state_.offroute.invalidateBaseline();
+    runtime_state_.route = {};
+    DropWedgeBaseline(&runtime_state_.offroute);
     runtime_state_.nav_run_dirty = true;
     if (generated_count == 0 && std::hypot(anchor.x - position_->x, anchor.y - position_->y) <= arrival_band_for_startup_bypass(anchor)) {
-        runtime_state_.route.confirmStartupAt(*position_);
+        ConfirmStartupAt(&runtime_state_.route, *position_);
     }
     runtime_state_.dynamic_replan_requested = false;
     const size_t planned_points = route->path.points.size();
@@ -206,7 +206,7 @@ bool NavigationStateMachine::giveUpUnreachableZipline(const char* reason)
     }
     ZiplineApproachState& approach = runtime_state_.zipline_approach;
     if (approach.anchor_index != anchor->first) {
-        approach.retarget(anchor->first);
+        RetargetZiplineApproach(&approach, anchor->first);
     }
     if (++approach.replans <= kZiplineApproachReplanBudget) {
         return false;
@@ -241,7 +241,7 @@ bool NavigationStateMachine::handleZiplineRecoveryReplan()
     }
 
     // 人在架子上时脚下就是架子, 不要求贴回网格
-    const bool on_tower = runtime_state_.isZiplineMounted();
+    const bool on_tower = IsZiplineMounted(runtime_state_);
     const navmesh::WorldPoint fix { .x = position_->x, .y = position_->y };
     const auto snap = NavmeshSnapAt(param_, position_->zone_id, fix, param_.navmesh_snap_radius);
     const bool on_mesh = on_tower || (snap && snap->distance <= param_.navmesh_snap_radius);
@@ -266,7 +266,7 @@ bool NavigationStateMachine::handleZiplineRecoveryReplan()
         LogWarn << "Zipline recovery could not re-expand from the tower; stepping down to retry from the ground." << VAR(elapsed_ms)
                 << VAR(position_->x) << VAR(position_->y);
         semantic_nodes::LeaveZiplineTower(semanticContext());
-        recovery.begin(std::chrono::steady_clock::now());
+        BeginZiplineRecovery(&recovery, std::chrono::steady_clock::now());
         return true;
     }
     if (!rejoined && on_mesh) {
@@ -285,8 +285,8 @@ bool NavigationStateMachine::handleZiplineRecoveryReplan()
             elapsed_ms);
     }
 
-    recovery.reset();
-    if (runtime_state_.isZiplineMounted()) {
+    recovery = {};
+    if (IsZiplineMounted(runtime_state_)) {
         semantic_nodes::StartZiplineHop(semanticContext(), session_->currentWaypoint(), 0.0);
         return true;
     }
@@ -356,12 +356,12 @@ bool NavigationStateMachine::tryReplanRemainingAuthoredRoute(const char* reason)
     }
 
     session_->replaceRoute(std::move(replanned), *position_, reason);
-    runtime_state_.route.reset();
-    runtime_state_.offroute.invalidateBaseline();
+    runtime_state_.route = {};
+    DropWedgeBaseline(&runtime_state_.offroute);
     runtime_state_.nav_run_dirty = true;
     runtime_state_.dynamic_replan_requested = false;
 
-    if (runtime_state_.isZiplineMounted()) {
+    if (IsZiplineMounted(runtime_state_)) {
         const semantic_nodes::Context ctx = semanticContext();
         if (semantic_nodes::SkipToHopUnderfoot(ctx, reason)) {
             LogInfo << "Zipline recovery re-expanded the remaining authored route; the next hop leaves from this tower." << VAR(reason)
@@ -411,7 +411,7 @@ bool NavigationStateMachine::handleDynamicReplanRequest(const char* reason)
     }
 
     runtime_state_.dynamic_replan_requested = false;
-    runtime_state_.route.resetTracking();
+    ResetRouteTracking(&runtime_state_.route);
     session_->resetProgress();
     LogWarn << "Dynamic navmesh replan unavailable; falling back to current route." << VAR(reason) << VAR(position_->x) << VAR(position_->y)
             << VAR(position_->zone_id);

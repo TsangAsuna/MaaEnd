@@ -218,7 +218,7 @@ std::optional<size_t> ResolveRouteResumeIndex(const std::vector<Waypoint>& path,
 
 bool NavigationStateMachine::bootstrap()
 {
-    runtime_state_.beginNavigation(std::chrono::steady_clock::now());
+    BeginNavigation(&runtime_state_, std::chrono::steady_clock::now());
     sensitivity::BeginRun();
 
     std::optional<DynamicAnchor> anchor;
@@ -239,7 +239,7 @@ bool NavigationStateMachine::bootstrap()
     if (continue_candidate && continue_candidate->continue_index > 0
         && continue_candidate->continue_index < session_->originalPath().size()) {
         session_->applyDynamicOverlay({}, continue_candidate->continue_index, *position_);
-        runtime_state_.route.reset();
+        runtime_state_.route = {};
         runtime_state_.nav_run_dirty = true;
         LogInfo << "Bootstrap serial route continue after navmesh overlay unavailable." << VAR(continue_candidate->continue_index)
                 << VAR(continue_candidate->route_distance) << VAR(position_->x) << VAR(position_->y) << VAR(position_->zone_id);

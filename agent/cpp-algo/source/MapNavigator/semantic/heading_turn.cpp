@@ -169,7 +169,7 @@ Result ConsumeHeadingNodes(const Context& ctx)
                 << VAR(achieved_heading);
         ctx.session->advanceToNextWaypoint(ActionType::HEADING, "heading_consumed");
         ctx.session->resetProgress();
-        ctx.runtime_state->onWaypointAdvance();
+        ResetOnWaypointAdvance(ctx.runtime_state);
         consumed = true;
 
         if (!ctx.session->hasCurrentWaypoint()) {
