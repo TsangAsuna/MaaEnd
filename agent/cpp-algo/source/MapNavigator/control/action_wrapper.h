@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 
 #include "MaaFramework/MaaAPI.h"
 
@@ -10,8 +9,6 @@
 
 namespace mapnavigator
 {
-
-class IInputBackend;
 
 class ActionWrapper
 {
@@ -28,6 +25,7 @@ public:
     double defaultPitchUnitsPerDegree() const;
     SteeringTransportProfile steeringProfile() const;
     bool supportsSprint() const;
+    // 返回 false 时走路请求不生效, 保持跑步速度
     bool supportsWalkToggle() const;
 
     void setMovementStateSync(MovementState state, int delay_millis);
@@ -50,7 +48,7 @@ public:
     void noteHeadingDisturbed() { ++heading_epoch_; }
 
 private:
-    std::unique_ptr<IInputBackend> backend_;
+    InputBackend backend_;
     uint64_t heading_epoch_ = 0;
 };
 
