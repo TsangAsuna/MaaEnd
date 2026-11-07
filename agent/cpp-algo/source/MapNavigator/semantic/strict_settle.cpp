@@ -68,7 +68,7 @@ bool capture_strict_goal_fix(const Context& ctx, const StrictSettleBudget& budge
         if (frame > 0 && !budget.sleep(std::chrono::milliseconds(kStrictSettleFixIntervalMs))) {
             break;
         }
-        if (!ctx.position_provider->captureForStrictGoal(out_pos, ctx.session->currentZoneId())) {
+        if (!CaptureForStrictGoal(ctx.position_provider, out_pos, ctx.session->currentZoneId())) {
             continue;
         }
         if (budget.exhausted()) {

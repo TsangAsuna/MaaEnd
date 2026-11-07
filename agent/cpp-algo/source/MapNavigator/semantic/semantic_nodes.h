@@ -9,7 +9,7 @@ namespace mapnavigator
 {
 
 struct Motion;
-class PositionProvider;
+struct PositionSensor;
 struct InputBackend;
 
 namespace semantic_nodes
@@ -18,7 +18,7 @@ namespace semantic_nodes
 struct Context
 {
     InputBackend* input_backend = nullptr;
-    PositionProvider* position_provider = nullptr;
+    PositionSensor* position_provider = nullptr;
     NavigationSession* session = nullptr;
     Motion* motion_controller = nullptr;
     NaviPosition* position = nullptr;

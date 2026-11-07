@@ -85,7 +85,7 @@ TickFix NavigationStateMachine::readFix(std::chrono::steady_clock::time_point no
     fix.steering_on_camera =
         fix.drops_turn_sends && (fix.arrow_lags_camera || (position_->camera_angle.has_value() && !motion_controller_->is_moving_forward));
     fix.steer_heading = fix.steering_on_camera ? NormalizeAngle(*position_->camera_angle) : fix.current_heading;
-    fix.degraded_fix = position_provider_->lastCaptureWasBlackScreen() || !position_->valid;
+    fix.degraded_fix = position_provider_->last_capture_was_black_screen || !position_->valid;
     fix.fix_age_ms = position_->timestamp.time_since_epoch().count() > 0
                          ? std::chrono::duration_cast<std::chrono::milliseconds>(now - position_->timestamp).count()
                          : 0;
@@ -161,7 +161,10 @@ TickStep NavigationStateMachine::checkRouteProgress(NavigateTick& tick)
         }
     }
     tick.stalled_ms = session_->stalledMs(tick.now);
-    device_recovery_.updateFeeding(tick.stalled_ms, runtime_state_.recovery_escalation.device_attempt_count < kRecoveryDeviceAttempts);
+    UpdateDeviceFeeding(
+        &device_recovery_,
+        tick.stalled_ms,
+        runtime_state_.recovery_escalation.device_attempt_count < kRecoveryDeviceAttempts);
 
     if (!route.valid) {
         if (tick.fix.degraded_fix) {

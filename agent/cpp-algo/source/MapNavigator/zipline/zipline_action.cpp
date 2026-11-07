@@ -83,7 +83,9 @@ public:
                     maplocator::SearchHint { .zone_id = zone, .x = node.x, .y = node.y, .radius = kZiplineLandingHintRadiusWu });
             }
         }
-        if (ctx_.position_provider->capture(ctx_.position, force_global_search, {}, hints)) {
+        const bool captured = force_global_search ? CaptureGlobal(ctx_.position_provider, ctx_.position, {}, hints)
+                                                  : CaptureTracked(ctx_.position_provider, ctx_.position, {}, hints);
+        if (captured) {
             obs.fix = *ctx_.position;
         }
         return obs;
@@ -102,7 +104,7 @@ public:
         return hint ? MountVerdict::OnTower : MountVerdict::Unclear;
     }
 
-    void resetTracking() override { ctx_.position_provider->resetTracking(); }
+    void resetTracking() override { ResetSensorTracking(ctx_.position_provider); }
 
 private:
     const Context& ctx_;
@@ -221,7 +223,7 @@ Result drop_chain_and_recover(const Context& ctx, const char* reason, const char
     ctx.runtime_state->zipline_approach = {};
     ResetOnWaypointAdvance(ctx.runtime_state);
     ctx.runtime_state->route = {};
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     ctx.session->resetProgress();
     // ResetOnWaypointAdvance 会清掉恢复状态和重规划标志, 这两行必须在它后面
     BeginZiplineRecovery(&ctx.runtime_state->zipline_recovery, std::chrono::steady_clock::now());
@@ -251,7 +253,7 @@ Result finish_hop(const Context& ctx, const HopCompleted& done)
     ctx.runtime_state->route = {};
     // 起步确认直接置位, 下一跳的上索点就在脚下, 拦住就得先走开再走回来
     ConfirmStartupAt(&ctx.runtime_state->route, done.at);
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
 
     if (!ctx.session->hasCurrentWaypoint()) {
         LeaveZiplineTower(ctx);
@@ -299,7 +301,7 @@ Result AdvanceMountSpot(const Context& ctx, const Waypoint& waypoint, const char
             << VAR(approach.spot_index) << VAR(spot_count) << VAR(spot.x) << VAR(spot.y);
     ctx.runtime_state->route = {};
     ConfirmStartupAt(&ctx.runtime_state->route, *ctx.position);
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     SelectPhaseForCurrentWaypoint(ctx, reason);
 
     Result result;

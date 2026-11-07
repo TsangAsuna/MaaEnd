@@ -22,7 +22,7 @@ namespace mapnavigator
 {
 
 struct Motion;
-class PositionProvider;
+struct PositionSensor;
 class RoiTemplateScanner;
 struct InputBackend;
 struct RouteMeasurement;
@@ -43,7 +43,7 @@ public:
     NavigationStateMachine(
         const NaviParam& param,
         InputBackend* input_backend,
-        PositionProvider* position_provider,
+        PositionSensor* position_provider,
         NavigationSession* session,
         Motion* motion_controller,
         NaviPosition* position,
@@ -160,7 +160,7 @@ private:
 
     const NaviParam& param_;
     InputBackend* input_backend_;
-    PositionProvider* position_provider_;
+    PositionSensor* position_provider_;
     NavigationSession* session_;
     Motion* motion_controller_;
     NaviPosition* position_;

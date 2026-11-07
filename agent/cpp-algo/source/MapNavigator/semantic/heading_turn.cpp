@@ -69,7 +69,7 @@ void AlignCameraToHeadingOnce(const Context& ctx)
     }
     SleepFor(kWaitAfterFirstTurnMs);
 
-    const bool captured = ctx.position_provider->capture(ctx.position, false, ctx.session->currentZoneId());
+    const bool captured = CaptureTracked(ctx.position_provider, ctx.position, ctx.session->currentZoneId());
     LogInfo << "Camera aligned to navigation heading." << VAR(heading) << VAR(camera_before) << VAR(delta) << VAR(captured);
 }
 
@@ -80,7 +80,7 @@ bool CaptureStableHeading(const Context& ctx, double* out_heading)
         if (frame > 0) {
             SleepFor(kHeadingStableReadIntervalMs);
         }
-        if (!ctx.position_provider->capture(ctx.position, false, ctx.session->currentZoneId())) {
+        if (!CaptureTracked(ctx.position_provider, ctx.position, ctx.session->currentZoneId())) {
             previous.reset();
             continue;
         }

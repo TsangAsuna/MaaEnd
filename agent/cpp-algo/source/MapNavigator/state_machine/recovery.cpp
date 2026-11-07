@@ -97,7 +97,7 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
         const bool fought_another_anchor = escalation.anchor_index != std::numeric_limits<size_t>::max();
         RetargetRecoveryEscalation(&escalation, anchor->first);
         if (fought_another_anchor) {
-            device_recovery_.forgetObservation();
+            ForgetDeviceObservation(&device_recovery_);
         }
     }
 
@@ -134,7 +134,7 @@ bool NavigationStateMachine::climbRecoveryLadder(const NavigateTick& tick, bool 
     const RouteMeasurement& route = tick.route;
     RecoveryEscalationState& escalation = runtime_state_.recovery_escalation;
     const DeviceRemovalOutcome device_outcome =
-        device_recovery_.tryRemove(route, waypoint, escalation.device_attempt_count < kRecoveryDeviceAttempts && far_or_strict);
+        TryRemoveDevice(&device_recovery_, route, waypoint, escalation.device_attempt_count < kRecoveryDeviceAttempts && far_or_strict);
     if (device_outcome != DeviceRemovalOutcome::NotAttempted) {
         ++escalation.device_attempt_count;
         NoteFailure(
@@ -166,7 +166,7 @@ bool NavigationStateMachine::climbRecoveryLadder(const NavigateTick& tick, bool 
     ApplyLocalAction(motion_controller_, LocalDriverAction::JumpForward);
     SleepFor(kActionJumpSettleMs);
     HoldPosition(motion_controller_);
-    if (!captureCurrentPosition(false) || position_provider_->lastCaptureWasBlackScreen() || !position_->valid) {
+    if (!captureCurrentPosition(false) || position_provider_->last_capture_was_black_screen || !position_->valid) {
         LogWarn << "Dynamic recovery waiting for post-jump local tracking fix." << VAR_AS(stalled_ms, tick.stalled_ms)
                 << VAR(escalation.jump_attempt_count);
         SleepFor(kTargetTickMs);
@@ -262,7 +262,7 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
     double moved = 0.0;
     for (int pulse = 0; pulse < kUnstickMaxPulses; ++pulse) {
         PulseForwardSync(input_backend_, kUnstickPulseMs);
-        if (!captureCurrentPosition(false) || position_provider_->lastCaptureWasBlackScreen() || !position_->valid) {
+        if (!captureCurrentPosition(false) || position_provider_->last_capture_was_black_screen || !position_->valid) {
             break;
         }
         moved = std::hypot(position_->x - step_start.x, position_->y - step_start.y);

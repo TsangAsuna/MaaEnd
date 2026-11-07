@@ -38,7 +38,7 @@ Result arrive_transfer(const Context& ctx, const std::optional<size_t>& node_idx
     const auto now = std::chrono::steady_clock::now();
     const bool waits = ctx.session->hasCurrentWaypoint();
     ctx.runtime_state->semantic.transfer = waits ? TransferWaitState { .started = now, .anchor = *ctx.position } : TransferWaitState {};
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     LogInfo << "Action: TRANSFER reached." << VAR(actual_distance);
 
     if (waits) {
@@ -59,7 +59,7 @@ Result arrive_portal(const Context& ctx, const std::optional<size_t>& node_idx, 
     ctx.runtime_state->semantic.portal = ctx.session->hasCurrentWaypoint()
                                              ? PortalTransitState { .phase = PortalTransitPhase::AwaitZone, .started = now }
                                              : PortalTransitState {};
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     MoveForward(ctx.motion_controller);
     LogInfo << "Action: PORTAL entered transit flow." << VAR(actual_distance);
     SelectPhaseForCurrentWaypoint(ctx, "portal_entered");
@@ -202,7 +202,7 @@ Result StartRopeRide(const Context& ctx, const RopeRideInfo& ride)
         .started = std::chrono::steady_clock::now(),
         .ride_ms = static_cast<int64_t>(std::ceil(ride.ride_s * 1000.0)),
     };
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     LogInfo << "Rope ride started." << VAR(ride.uid) << VAR(ride.ride_s) << VAR(ride.top_height);
     if (!ctx.session->hasCurrentWaypoint() || !ctx.session->currentWaypoint().rope_top) {
         LogWarn << "Rope ride started without a top landing as the next point." << VAR(ride.uid);

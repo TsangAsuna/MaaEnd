@@ -53,8 +53,8 @@ bool reached_arrive_point(const Context& ctx, const Waypoint& waypoint)
     if (!waypoint.find_arrive.has_value()) {
         return false;
     }
-    if (!ctx.position_provider->capture(ctx.position, false, ctx.session->currentZoneId())
-        || ctx.position_provider->lastCaptureWasBlackScreen()) {
+    if (!CaptureTracked(ctx.position_provider, ctx.position, ctx.session->currentZoneId())
+        || ctx.position_provider->last_capture_was_black_screen) {
         return false;
     }
 
@@ -72,7 +72,7 @@ void leave_find_phase(const Context& ctx)
     ResetNavigationAssistState(ctx.runtime_state);
     ctx.runtime_state->flow.motionless_hold_ticks = 0;
     ctx.runtime_state->flow.futile_forward_reasserts = 0;
-    ctx.position_provider->resetTracking();
+    ResetSensorTracking(ctx.position_provider);
     ctx.session->resetProgress();
     ctx.runtime_state->find = {};
 }

@@ -25,7 +25,7 @@ namespace mapnavigator
 NavigationStateMachine::NavigationStateMachine(
     const NaviParam& param,
     InputBackend* input_backend,
-    PositionProvider* position_provider,
+    PositionSensor* position_provider,
     NavigationSession* session,
     Motion* motion_controller,
     NaviPosition* position,
@@ -39,9 +39,9 @@ NavigationStateMachine::NavigationStateMachine(
     , position_(position)
     , should_stop_(std::move(should_stop))
     , maa_context_(maa_context)
-    , collect_prompt_(kCollectPromptSpec, maa_context, session, position)
-    , interact_prompt_(kInteractPromptSpec, maa_context, session, position)
-    , device_recovery_(maa_context, motion_controller, position_provider, session, position)
+    , collect_prompt_(MakeAsyncPromptAction(kCollectPromptSpec, maa_context, session, position))
+    , interact_prompt_(MakeAsyncPromptAction(kInteractPromptSpec, maa_context, session, position))
+    , device_recovery_(MakeDeviceRecovery(maa_context, motion_controller, position_provider, session, position))
     , walk_mode_(walkmode::OpenToggle(input_backend))
     , restore_jog_on_exit_ { walk_mode_ }
 {
@@ -126,7 +126,7 @@ bool NavigationStateMachine::tickPhase(NaviPhase phase)
     case NaviPhase::WaitRope: {
         runtime_state_.flow.motionless_hold_ticks = 0;
         runtime_state_.flow.futile_forward_reasserts = 0;
-        device_recovery_.forgetObservation();
+        ForgetDeviceObservation(&device_recovery_);
         const semantic_nodes::Result semantic_result = semantic_nodes::TickWaitPhase(semanticContext(), phase);
         if (semantic_result.request_failure) {
             return failNavigation(semantic_result.failure_reason, semantic_result.failure_log_message, 0.0, 0.0, 0);

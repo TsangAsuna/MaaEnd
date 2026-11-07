@@ -70,7 +70,9 @@ bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
                               && prior_observation_epoch_ && *prior_observation_epoch_ == heading_epoch
                               && session_->phase() == NaviPhase::Navigate;
     const std::optional<double> camera_heading_prior = prior_usable ? std::optional<double>(position_->angle) : std::nullopt;
-    const bool captured = position_provider_->capture(position_, force_global_search, session_->currentZoneId(), {}, camera_heading_prior);
+    const bool captured = force_global_search
+                              ? CaptureGlobal(position_provider_, position_, session_->currentZoneId(), {}, camera_heading_prior)
+                              : CaptureTracked(position_provider_, position_, session_->currentZoneId(), {}, camera_heading_prior);
     if (captured) {
         prior_observation_epoch_ = heading_epoch;
         consecutive_prior_uses_ = camera_heading_prior ? consecutive_prior_uses_ + 1 : 0;
@@ -84,7 +86,7 @@ bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
         std::chrono::steady_clock::now(),
         *position_,
         captured,
-        position_provider_->lastLocateMessage(),
+        position_provider_->last_locate_message,
         session_->currentNodeIdx(),
         navi_phase_name(session_->phase()));
     updateDwellWatchdog(captured);
@@ -94,7 +96,7 @@ bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
 void NavigationStateMachine::updateDwellWatchdog(bool captured)
 {
     DwellWatchdogState& dwell = runtime_state_.dwell;
-    const bool usable = captured && position_->valid && !position_provider_->lastCaptureWasBlackScreen();
+    const bool usable = captured && position_->valid && !position_provider_->last_capture_was_black_screen;
     if (!usable || session_->phase() != NaviPhase::Navigate) {
         dwell.last_usable = {};
         return;
@@ -188,7 +190,7 @@ bool NavigationStateMachine::handleLocalizationLoss()
     }
     PauseWedge(&runtime_state_.offroute, now);
     // 丢定位期间截到黑屏就是落水了
-    if (position_provider_->lastCaptureWasBlackScreen()) {
+    if (position_provider_->last_capture_was_black_screen) {
         loss.saw_black_screen = true;
     }
     HoldPosition(motion_controller_);
@@ -212,8 +214,8 @@ bool NavigationStateMachine::handleLocalizationLoss()
     if (!relocalize_cooling) {
         last_global_relocalize_at_ = now;
         const std::string prior_zone = session_->currentZoneId();
-        const bool reacquired = position_provider_->capture(position_, /*force_global_search=*/true, /*expected_zone_id=*/std::string());
-        NoteFailure(&failure_trail_, now, "global relocalize " + position_provider_->lastLocateMessage());
+        const bool reacquired = CaptureGlobal(position_provider_, position_, /*expected_zone_id=*/std::string());
+        NoteFailure(&failure_trail_, now, "global relocalize " + position_provider_->last_locate_message);
         if (reacquired) {
             return resumeAfterGlobalReacquire(prior_zone, loss_elapsed);
         }
@@ -243,7 +245,7 @@ bool NavigationStateMachine::sceneRecoveryAllowed()
 {
     const LocalizationLossState& loss = runtime_state_.localization_loss;
     const bool attempted = runtime_state_.scene_recovery_attempted;
-    const bool foreign_ui = position_provider_->lastCaptureMinimapAbsent() && !loss.saw_black_screen;
+    const bool foreign_ui = position_provider_->last_capture_minimap_absent && !loss.saw_black_screen;
     const bool own_ui = semantic_nodes::IsTriggerPending(*session_)
                         || ElapsedMs(session_->lastInteractionAt(), loss.started_at) < kSceneRecoveryInteractionQuietMs;
     if (attempted || !foreign_ui || own_ui) {
@@ -278,7 +280,7 @@ bool NavigationStateMachine::returnToWorld()
     const std::optional<std::vector<std::string>> handled =
         RunTaskForCompletedNodes(maa_context_, kSceneRecoveryEntryNode, scene_recovery_override(esc_used));
     const bool restored =
-        position_provider_->waitForFix(position_, std::string(), kSceneRecoveryFixAttempts, kRelocationRetryIntervalMs, should_stop_);
+        WaitForFix(position_provider_, position_, std::string(), kSceneRecoveryFixAttempts, kRelocationRetryIntervalMs, should_stop_);
     LogInfo << "Scene recovery finished." << VAR(restored) << VAR(handled) << VAR(esc_used);
     NoteFailure(&failure_trail_, std::chrono::steady_clock::now(), restored ? "scene recovery restored" : "scene recovery failed");
     return restored;

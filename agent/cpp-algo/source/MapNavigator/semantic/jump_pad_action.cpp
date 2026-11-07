@@ -126,8 +126,8 @@ Result TickJumpPad(const Context& ctx)
     HoldPosition(ctx.motion_controller);
 
     // 起飞前要用可信的镜头朝向对准板心, 起飞后只看位置
-    const bool captured = state.launched ? ctx.position_provider->capture(ctx.position, false, {})
-                                         : ctx.position_provider->captureForStrictGoal(ctx.position, state.pad.zone_id);
+    const bool captured = state.launched ? CaptureTracked(ctx.position_provider, ctx.position, {})
+                                         : CaptureForStrictGoal(ctx.position_provider, ctx.position, state.pad.zone_id);
     if (!captured) {
         state.last_fix.reset();
         state.still_reads = 0;
@@ -151,7 +151,7 @@ Result TickJumpPad(const Context& ctx)
         state.launched = true;
         state.launched_at = std::chrono::steady_clock::now();
         state.still_reads = 0;
-        ctx.position_provider->resetTracking();
+        ResetSensorTracking(ctx.position_provider);
         LogInfo << "Jump pad launched." << VAR(offset) << VAR(state.jumps) << VAR(state.nudges);
     }
     return state.launched ? tick_landing(ctx, state) : tick_on_pad(ctx, state, offset);

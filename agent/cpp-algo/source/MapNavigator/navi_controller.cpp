@@ -93,10 +93,10 @@ void offset_authored_groups(std::vector<Waypoint>& path, size_t resume_index)
 
 bool navigate_with_backend(MaaContext* ctx, NaviParam& param, InputBackend* input_backend)
 {
-    PositionProvider position_provider(input_backend->ctrl, maplocator::getOrInitLocator(), param.heading_source);
-    position_provider.resetTracking();
+    PositionSensor position_provider = MakePositionSensor(input_backend->ctrl, maplocator::getOrInitLocator(), param.heading_source);
+    ResetSensorTracking(&position_provider);
     if (param.normalize_position_via_navmesh) {
-        position_provider.setPositionNormalizer([&param](NaviPosition& pos) { NormalizeLivePositionToBase(param, pos); });
+        position_provider.normalize_param = &param;
     }
     const char* controller_type = input_backend->controller_type.c_str();
     const bool uses_touch_backend = UsesTouchBackend(*input_backend);
@@ -122,7 +122,7 @@ bool navigate_with_backend(MaaContext* ctx, NaviParam& param, InputBackend* inpu
 
     NaviPosition pos;
     const std::string initial_expected_zone = InitialExpectedZone(param);
-    if (!position_provider.waitForFix(&pos, initial_expected_zone, kLocatorWaitMaxRetries, kLocatorWaitIntervalMs, is_stopping)
+    if (!WaitForFix(&position_provider, &pos, initial_expected_zone, kLocatorWaitMaxRetries, kLocatorWaitIntervalMs, is_stopping)
         || is_stopping()) {
         return false;
     }
