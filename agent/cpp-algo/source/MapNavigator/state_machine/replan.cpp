@@ -321,7 +321,7 @@ bool NavigationStateMachine::tryReplanRemainingAuthoredRoute(const char* reason)
     }
 
     NaviParam replan_param = param_;
-    const HopLedger& ledger = runtime_state_.zipline_ride.ledger();
+    const HopLedger& ledger = runtime_state_.zipline_ride.ledger;
     const int32_t rope_failures = CountZiplineRopeFailures(ledger);
     if (rope_failures >= kZiplineAbandonWalkFallbackCount) {
         replan_param.zipline_enabled = false;
