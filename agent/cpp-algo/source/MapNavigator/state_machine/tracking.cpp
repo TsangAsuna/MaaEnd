@@ -96,16 +96,17 @@ void NavigationStateMachine::tickNavRun(NavigateTick& tick)
 {
     if (const std::optional<DynamicAnchor> nav_run_anchor = resolve_nav_run_anchor(session_, *position_, tick.route)) {
         tick.nav_run_anchor_index = nav_run_anchor->first;
-        tick.nav_run_result = nav_run_controller_.tick(
+        tick.nav_run_result = TickNavRun(
+            &nav_run_,
             session_,
             &runtime_state_,
+            motion_controller_,
             *position_,
             tick.route,
             param_,
-            nav_run_anchor->first,
             nav_run_anchor->second,
-            tick.now,
-            [this] { HoldPosition(motion_controller_); });
+            nav_run_anchor->first,
+            tick.now);
     }
     if (tick.nav_run_result.planning > std::chrono::steady_clock::duration::zero()) {
         PauseWedge(&runtime_state_.offroute, tick.now);

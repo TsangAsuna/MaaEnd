@@ -337,7 +337,7 @@ bool NavigationStateMachine::tryReplanRemainingAuthoredRoute(const char* reason)
         return ExpandNavmeshWaypoints(
             replan_param,
             *position_,
-            should_stop_,
+            maa_context_,
             replanned,
             nullptr,
             &runtime_state_.virtual_no_go,

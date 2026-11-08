@@ -167,7 +167,7 @@ private:
     std::function<bool()> should_stop_;
     MaaContext* maa_context_;
     NavigationRuntimeState runtime_state_ {};
-    NavRunController nav_run_controller_ {};
+    NavRun nav_run_ {};
     FailureTrail failure_trail_;
     std::chrono::steady_clock::time_point last_global_relocalize_at_ {};
     std::optional<uint64_t> prior_observation_epoch_;
