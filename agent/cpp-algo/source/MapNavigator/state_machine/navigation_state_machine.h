@@ -44,7 +44,7 @@ public:
         const NaviParam& param,
         InputBackend* input_backend,
         PositionSensor* position_provider,
-        NavigationSession* session,
+        Session* session,
         Motion* motion_controller,
         NaviPosition* position,
         std::function<bool()> should_stop,
@@ -161,7 +161,7 @@ private:
     const NaviParam& param_;
     InputBackend* input_backend_;
     PositionSensor* position_provider_;
-    NavigationSession* session_;
+    Session* session_;
     Motion* motion_controller_;
     NaviPosition* position_;
     std::function<bool()> should_stop_;

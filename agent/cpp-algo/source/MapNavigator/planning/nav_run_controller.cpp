@@ -123,7 +123,7 @@ double corridor_arc_length_to(const navmesh::WorldPath& path, const std::vector<
 }
 
 size_t count_corridor_passed_run_waypoints(
-    const NavigationSession& session,
+    const Session& session,
     const navmesh::WorldPath& path,
     const std::vector<double>& arc_prefix,
     size_t anchor_index,
@@ -133,11 +133,11 @@ size_t count_corridor_passed_run_waypoints(
         return 0;
     }
 
-    const std::vector<Waypoint>& waypoints = session.currentPath();
+    const std::vector<Waypoint>& waypoints = session.current_path;
     const double margin = std::max(kMeasurementDefaultPositionQuantum, 0.0);
     size_t count = 0;
-    for (size_t index = session.currentNodeIdx(); index < waypoints.size(); ++index) {
-        const std::optional<size_t> canonical = session.canonicalIndexAtCurrentPath(index);
+    for (size_t index = session.current_node_idx; index < waypoints.size(); ++index) {
+        const std::optional<size_t> canonical = CanonicalIndexAtCurrentPath(session, index);
         if (canonical && *canonical == anchor_index) {
             break;
         }
@@ -310,13 +310,13 @@ int64_t elapsed_ms_or_max(std::chrono::steady_clock::time_point from, std::chron
 }
 
 // 线没走到锚点就返回空, 调用方据此改用 navmesh 走廊
-navmesh::WorldPath build_authored_span_polyline(const NavigationSession& session, size_t anchor_index)
+navmesh::WorldPath build_authored_span_polyline(const Session& session, size_t anchor_index)
 {
-    const std::vector<Waypoint>& waypoints = session.currentPath();
+    const std::vector<Waypoint>& waypoints = session.current_path;
     navmesh::WorldPath poly;
     bool reached_anchor = false;
     bool any_clearance = false;
-    for (size_t index = session.currentNodeIdx(); index < waypoints.size(); ++index) {
+    for (size_t index = session.current_node_idx; index < waypoints.size(); ++index) {
         const Waypoint& waypoint = waypoints[index];
         if (!waypoint.has_position) {
             break;
@@ -324,7 +324,7 @@ navmesh::WorldPath build_authored_span_polyline(const NavigationSession& session
         poly.points.push_back({ .x = waypoint.x, .y = waypoint.y });
         poly.clearance.push_back(waypoint.corridor_clearance);
         any_clearance = any_clearance || waypoint.corridor_clearance > 0.0;
-        const std::optional<size_t> canonical = session.canonicalIndexAtCurrentPath(index);
+        const std::optional<size_t> canonical = CanonicalIndexAtCurrentPath(session, index);
         if (canonical && *canonical == anchor_index) {
             reached_anchor = true;
             break;
@@ -343,15 +343,15 @@ navmesh::WorldPath build_authored_span_polyline(const NavigationSession& session
 // 起跳点判到达时人常还站在台上, 只剩落点会触发重规划, 所以把起跳点补回线头
 bool prepend_drop_top_while_short(
     navmesh::WorldPath& authored,
-    const NavigationSession& session,
+    const Session& session,
     const Waypoint& anchor,
     const NaviPosition& position)
 {
-    const size_t current = session.currentNodeIdx();
+    const size_t current = session.current_node_idx;
     if (authored.points.size() != 1 || !anchor.drop_from || current == 0) {
         return false;
     }
-    const Waypoint& top = session.currentPath()[current - 1];
+    const Waypoint& top = session.current_path[current - 1];
     const double top_x = (*anchor.drop_from)[0];
     const double top_y = (*anchor.drop_from)[1];
     if (!IsContinuousRun(top) || top.x != top_x || top.y != top_y) {
@@ -436,7 +436,7 @@ bool NavRunController::buildPlan(
     std::chrono::steady_clock::time_point& now,
     NavRunTickResult& result)
 {
-    const NavigationSession& session = input.session;
+    const Session& session = input.session;
     const NaviPosition& position = input.position;
     const size_t anchor_index = input.anchor_index;
     const Waypoint& anchor = input.anchor;
@@ -499,8 +499,8 @@ bool NavRunController::buildPlan(
         position.zone_id,
         {
             .start = start,
-            .start_floor_y = session.walkedFloorY(position),
-            .start_deck_y = session.landedTowerDeckY(position),
+            .start_floor_y = WalkedFloorY(session, position),
+            .start_deck_y = LandedTowerDeckY(session, position),
             .goal = goal,
             .goal_deck_y = anchor.target_deck_y,
         },
@@ -649,7 +649,7 @@ void NavRunController::trackProgress(double remaining, std::chrono::steady_clock
 }
 
 NavRunTickResult NavRunController::tick(
-    NavigationSession* session,
+    Session* session,
     NavigationRuntimeState* runtime,
     const NaviPosition& position,
     const RouteMeasurement& route,
@@ -668,10 +668,10 @@ NavRunTickResult NavRunController::tick(
     // 必须在下面所有提前返回之前, 走廊不可用时测速窗口也要继续积累
     recordSpeedSample(position, now);
 
-    if (!anchor.has_position || !session->hasCurrentWaypoint()) {
+    if (!anchor.has_position || !HasCurrentWaypoint(*session)) {
         return result;
     }
-    if (!can_use_nav_run_steering(session->currentWaypoint())) {
+    if (!can_use_nav_run_steering(CurrentWaypoint(*session))) {
         return result;
     }
 
@@ -713,7 +713,7 @@ NavRunTickResult NavRunController::tick(
     }
     for (const navmesh::DropLanding& drop : plan_.path.drops) {
         if (plan_.cursor + 1 >= drop.index) {
-            session->leaveLandedTowerDeck();
+            LeaveLandedTowerDeck(session);
             break;
         }
     }
@@ -760,7 +760,7 @@ NavRunTickResult NavRunController::tick(
     if (clamped_without_passage) {
         if (corridor_passed > 0) {
             LogDebug << "Corridor passed advance suppressed; corridor projection clamped outside the window." << VAR(corridor_passed)
-                     << VAR_AS(session->current_node_idx(), session->currentNodeIdx()) << VAR(projection->before_window)
+                     << VAR_AS(session->current_node_idx(), session->current_node_idx) << VAR(projection->before_window)
                      << VAR(projection->after_window) << VAR(projection->capped) << VAR(projection->cross_track);
         }
     }
@@ -769,7 +769,7 @@ NavRunTickResult NavRunController::tick(
     }
     else if (corridor_passed > 0) {
         LogDebug << "Corridor passed advance blocked before startup movement confirmed." << VAR(corridor_passed)
-                 << VAR_AS(session->current_node_idx(), session->currentNodeIdx()) << VAR(character_arc);
+                 << VAR_AS(session->current_node_idx(), session->current_node_idx) << VAR(character_arc);
     }
     return result;
 }

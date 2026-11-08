@@ -145,8 +145,8 @@ bool navigate_with_backend(MaaContext* ctx, NaviParam& param, InputBackend* inpu
     expanded_param.authored_path = std::move(param.path);
     offset_authored_groups(expanded_param.path, *resume_index);
 
-    NavigationSession session(expanded_param.path, pos);
-    session.updatePhase(NaviPhase::Bootstrap, "initial_fix");
+    Session session = MakeSession(expanded_param.path, pos);
+    UpdatePhase(&session, NaviPhase::Bootstrap, "initial_fix");
 
     Motion motion_controller = MakeMotion(input_backend);
     motion_controller.enable_local_driver = param.enable_local_driver;

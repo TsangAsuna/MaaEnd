@@ -68,11 +68,11 @@ bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
     const uint64_t heading_epoch = input_backend_->heading_epoch;
     const bool prior_usable = !force_global_search && param_.heading_source == HeadingSource::Camera && position_->valid
                               && prior_observation_epoch_ && *prior_observation_epoch_ == heading_epoch
-                              && session_->phase() == NaviPhase::Navigate;
+                              && session_->phase == NaviPhase::Navigate;
     const std::optional<double> camera_heading_prior = prior_usable ? std::optional<double>(position_->angle) : std::nullopt;
     const bool captured = force_global_search
-                              ? CaptureGlobal(position_provider_, position_, session_->currentZoneId(), {}, camera_heading_prior)
-                              : CaptureTracked(position_provider_, position_, session_->currentZoneId(), {}, camera_heading_prior);
+                              ? CaptureGlobal(position_provider_, position_, session_->current_zone_id, {}, camera_heading_prior)
+                              : CaptureTracked(position_provider_, position_, session_->current_zone_id, {}, camera_heading_prior);
     if (captured) {
         prior_observation_epoch_ = heading_epoch;
         consecutive_prior_uses_ = camera_heading_prior ? consecutive_prior_uses_ + 1 : 0;
@@ -87,8 +87,8 @@ bool NavigationStateMachine::captureCurrentPosition(bool force_global_search)
         *position_,
         captured,
         position_provider_->last_locate_message,
-        session_->currentNodeIdx(),
-        navi_phase_name(session_->phase()));
+        session_->current_node_idx,
+        navi_phase_name(session_->phase));
     updateDwellWatchdog(captured);
     return captured;
 }
@@ -97,7 +97,7 @@ void NavigationStateMachine::updateDwellWatchdog(bool captured)
 {
     DwellWatchdogState& dwell = runtime_state_.dwell;
     const bool usable = captured && position_->valid && !position_provider_->last_capture_was_black_screen;
-    if (!usable || session_->phase() != NaviPhase::Navigate) {
+    if (!usable || session_->phase != NaviPhase::Navigate) {
         dwell.last_usable = {};
         return;
     }
@@ -157,10 +157,10 @@ bool NavigationStateMachine::endLocalizationLoss()
 
 TickStep NavigationStateMachine::checkDwellWatchdog()
 {
-    if (runtime_state_.dwell.dwell_ms < kDwellWatchdogFailMs || !session_->hasCurrentWaypoint()) {
+    if (runtime_state_.dwell.dwell_ms < kDwellWatchdogFailMs || !HasCurrentWaypoint(*session_)) {
         return TickStep::Next;
     }
-    const Waypoint& pinned_at = session_->currentWaypoint();
+    const Waypoint& pinned_at = CurrentWaypoint(*session_);
     if (pinned_at.action == ActionType::ZIPLINE) {
         LogWarn << "Dwell watchdog tripped at a zipline tower; dropping the chain and walking." << VAR(runtime_state_.dwell.dwell_ms)
                 << VAR(position_->x) << VAR(position_->y);
@@ -170,7 +170,7 @@ TickStep NavigationStateMachine::checkDwellWatchdog()
     }
     LogError << "Dwell watchdog tripped; the agent never left its dwell radius." << VAR(runtime_state_.dwell.dwell_ms)
              << VAR(runtime_state_.dwell.center_x) << VAR(runtime_state_.dwell.center_y) << VAR(position_->x) << VAR(position_->y)
-             << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx());
+             << VAR_AS(session_->current_node_idx(), session_->current_node_idx);
     return EndTickWith(failNavigation(
         "dwell_watchdog",
         "Agent stayed inside the dwell radius past the watchdog budget; terminating so the pipeline can retry.",
@@ -198,7 +198,7 @@ bool NavigationStateMachine::handleLocalizationLoss()
     const auto loss_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - loss.started_at);
     if (loss_elapsed >= std::chrono::milliseconds(kLocalizationLossTimeoutMs)) {
         if (sceneRecoveryAllowed() && runSceneRecovery()) {
-            return resumeAfterGlobalReacquire(session_->currentZoneId(), loss_elapsed);
+            return resumeAfterGlobalReacquire(session_->current_zone_id, loss_elapsed);
         }
         return failNavigation(
             "localization_lost_timeout",
@@ -213,7 +213,7 @@ bool NavigationStateMachine::handleLocalizationLoss()
                                            < std::chrono::milliseconds(kRelocationRetryIntervalMs);
     if (!relocalize_cooling) {
         last_global_relocalize_at_ = now;
-        const std::string prior_zone = session_->currentZoneId();
+        const std::string prior_zone = session_->current_zone_id;
         const bool reacquired = CaptureGlobal(position_provider_, position_, /*expected_zone_id=*/std::string());
         NoteFailure(&failure_trail_, now, "global relocalize " + position_provider_->last_locate_message);
         if (reacquired) {
@@ -247,7 +247,7 @@ bool NavigationStateMachine::sceneRecoveryAllowed()
     const bool attempted = runtime_state_.scene_recovery_attempted;
     const bool foreign_ui = position_provider_->last_capture_minimap_absent && !loss.saw_black_screen;
     const bool own_ui = semantic_nodes::IsTriggerPending(*session_)
-                        || ElapsedMs(session_->lastInteractionAt(), loss.started_at) < kSceneRecoveryInteractionQuietMs;
+                        || ElapsedMs(session_->last_interaction_at, loss.started_at) < kSceneRecoveryInteractionQuietMs;
     if (attempted || !foreign_ui || own_ui) {
         LogInfo << "Scene recovery declined." << VAR(attempted) << VAR(foreign_ui) << VAR(own_ui);
         return false;
@@ -266,7 +266,7 @@ bool NavigationStateMachine::runSceneRecovery()
         return false;
     }
     // 被界面盖住和清界面的这段时间人走不了, 不算停滞
-    session_->excludeFromStallClocks(std::chrono::steady_clock::now() - runtime_state_.localization_loss.started_at);
+    ExcludeFromStallClocks(session_, std::chrono::steady_clock::now() - runtime_state_.localization_loss.started_at);
     return true;
 }
 
@@ -296,7 +296,7 @@ bool NavigationStateMachine::resumeAfterGlobalReacquire(const std::string& prior
             LogInfo << "Cross-tier escape rode a zone flip; preserving the corridor." << VAR(prior_zone) << VAR(position_->zone_id)
                     << VAR(position_->x) << VAR(position_->y);
             if (zone_changed) {
-                session_->updateCurrentZone(position_->zone_id);
+                UpdateCurrentZone(session_, position_->zone_id);
             }
             loss = {};
             return true;
@@ -312,7 +312,7 @@ bool NavigationStateMachine::resumeAfterGlobalReacquire(const std::string& prior
 
     if (zone_changed) {
         // 不更新的话下次取位还按旧区域找, 会接着失败
-        session_->updateCurrentZone(position_->zone_id);
+        UpdateCurrentZone(session_, position_->zone_id);
     }
     const bool dropped_frames = !zone_changed && !loss.saw_black_screen
                                 && loss_elapsed < std::chrono::milliseconds(kLocalizationLossUnstickIntervalMs)
@@ -334,7 +334,7 @@ bool NavigationStateMachine::resumeAfterGlobalReacquire(const std::string& prior
     loss = {};
     ResetRouteTracking(&runtime_state_.route);
     runtime_state_.nav_run_dirty = true;
-    session_->resetProgress();
+    ResetProgress(session_);
     return true;
 }
 
@@ -346,7 +346,7 @@ bool NavigationStateMachine::armRiverFallRecoveryIfBlackScreenLoss(const char* v
     ArmRiverFallRecovery(&runtime_state_.river_fall, *position_, NormalizeAngle(position_->angle));
     // 落水前的卡死恢复已经过时, 留着会抢在上岸流程前面
     runtime_state_.recovery = {};
-    session_->resetHardProgress();
+    ResetHardProgress(session_);
     LogInfo << "River-fall recovery armed (black-screen loss recovered)." << VAR(via) << VAR(position_->x) << VAR(position_->y)
             << VAR(runtime_state_.river_fall.water_heading);
     return true;
@@ -359,7 +359,7 @@ TickStep NavigationStateMachine::runRiverFallRecovery(const NavigateTick& tick)
     }
     const RouteMeasurement& route = tick.route;
     PauseWedge(&runtime_state_.offroute, tick.now);
-    if (session_->hardStalledMs(tick.now) > kRiverFallRecoveryTimeoutMs) {
+    if (HardStalledMs(*session_, tick.now) > kRiverFallRecoveryTimeoutMs) {
         return EndTickWith(failNavigation(
             "river_fall_recovery_timeout",
             "River-fall recovery made no net progress past the timeout; terminating navigation.",
@@ -392,7 +392,7 @@ bool NavigationStateMachine::tryEnterCrossTierEscape()
         return false;
     }
     EngageCrossTierEscape(&runtime_state_.cross_tier_escape, position_->zone_id);
-    session_->resetHardProgress();
+    ResetHardProgress(session_);
     LogInfo << "Cross-tier escape engaged: routing out of a wrong tier via navmesh." << VAR(position_->zone_id) << VAR(position_->x)
             << VAR(position_->y) << VAR(runtime_state_.cross_tier_escape.goal_x) << VAR(runtime_state_.cross_tier_escape.goal_y);
     return true;
@@ -400,14 +400,14 @@ bool NavigationStateMachine::tryEnterCrossTierEscape()
 
 bool NavigationStateMachine::planCrossTierEscapeCorridorFromHere(const char* reason)
 {
-    const std::vector<Waypoint>& path = session_->currentPath();
-    for (size_t index = session_->currentNodeIdx(); index < path.size(); ++index) {
-        // 必须拷贝, 叠加成功会重建 current_path_
-        const Waypoint candidate = session_->currentPathAt(index);
+    const std::vector<Waypoint>& path = session_->current_path;
+    for (size_t index = session_->current_node_idx; index < path.size(); ++index) {
+        // 必须拷贝, 叠加成功会重建 current_path
+        const Waypoint candidate = CurrentPathAt(*session_, index);
         if (!candidate.has_position) {
             continue;
         }
-        const std::optional<size_t> continue_index = session_->canonicalIndexAtCurrentPath(index);
+        const std::optional<size_t> continue_index = CanonicalIndexAtCurrentPath(*session_, index);
         if (!continue_index) {
             continue;
         }

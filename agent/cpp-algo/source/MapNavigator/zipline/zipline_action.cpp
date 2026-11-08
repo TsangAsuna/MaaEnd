@@ -203,18 +203,18 @@ Result drop_chain_and_recover(const Context& ctx, const char* reason, const char
         LeaveZiplineTower(ctx);
     }
 
-    const std::vector<Waypoint>& path = ctx.session->currentPath();
-    const size_t hop = skip_continuous_run(path, ctx.session->currentNodeIdx());
+    const std::vector<Waypoint>& path = ctx.session->current_path;
+    const size_t hop = skip_continuous_run(path, ctx.session->current_node_idx);
     // 整条链一起丢, 留一跳重规划就会把人送回刚失败的索
     size_t dropped = 0;
     while (hop + dropped < path.size() && path[hop + dropped].action == ActionType::ZIPLINE) {
         ++dropped;
     }
     if (dropped != 0) {
-        ctx.session->skipPastWaypoint(hop + dropped - 1, reason);
+        SkipPastWaypoint(ctx.session, hop + dropped - 1, reason);
     }
     if (stay_on_tower) {
-        ctx.session->noteStandingTower(ctx.runtime_state->zipline_ride.towerUnderfoot());
+        NoteStandingTower(ctx.session, ctx.runtime_state->zipline_ride.towerUnderfoot());
     }
 
     LogWarn << "Action: ZIPLINE given up, recovering from a fresh position." << VAR(reason) << VAR(detail) << VAR(dropped)
@@ -224,7 +224,7 @@ Result drop_chain_and_recover(const Context& ctx, const char* reason, const char
     ResetOnWaypointAdvance(ctx.runtime_state);
     ctx.runtime_state->route = {};
     ResetSensorTracking(ctx.position_provider);
-    ctx.session->resetProgress();
+    ResetProgress(ctx.session);
     // ResetOnWaypointAdvance 会清掉恢复状态和重规划标志, 这两行必须在它后面
     BeginZiplineRecovery(&ctx.runtime_state->zipline_recovery, std::chrono::steady_clock::now());
     ctx.runtime_state->dynamic_replan_requested = true;
@@ -241,28 +241,28 @@ Result finish_hop(const Context& ctx, const HopCompleted& done)
     result.consumed = true;
     result.stay_in_current_tick = true;
 
-    ctx.session->noteCanonicalFinalGoalConsumed(ctx.session->currentAbsoluteNodeIndex(), done.at, "zipline_ride_complete");
-    ctx.session->advanceToNextWaypoint(ActionType::ZIPLINE, "zipline_ride_complete");
+    NoteCanonicalFinalGoalConsumed(ctx.session, CurrentAbsoluteNodeIndex(*ctx.session), done.at, "zipline_ride_complete");
+    AdvanceToNextWaypoint(ctx.session, ActionType::ZIPLINE, "zipline_ride_complete");
     ResetOnWaypointAdvance(ctx.runtime_state);
     LogInfo << "Action: ZIPLINE ride landed." << VAR(done.at.x) << VAR(done.at.y) << VAR(done.still_on_tower);
     if (!done.at.zone_id.empty()) {
-        ctx.session->updateCurrentZone(done.at.zone_id);
+        UpdateCurrentZone(ctx.session, done.at.zone_id);
     }
-    ctx.session->resetProgress();
+    ResetProgress(ctx.session);
     ResetNavigationAssistState(ctx.runtime_state);
     ctx.runtime_state->route = {};
     // 起步确认直接置位, 下一跳的上索点就在脚下, 拦住就得先走开再走回来
     ConfirmStartupAt(&ctx.runtime_state->route, done.at);
     ResetSensorTracking(ctx.position_provider);
 
-    if (!ctx.session->hasCurrentWaypoint()) {
+    if (!HasCurrentWaypoint(*ctx.session)) {
         LeaveZiplineTower(ctx);
-        ctx.session->noteRouteTailConsumed(done.at, "route_tail_consumed");
+        NoteRouteTailConsumed(ctx.session, done.at, "route_tail_consumed");
         return result;
     }
     if (done.still_on_tower) {
         if (SkipToHopUnderfoot(ctx, "zipline_ride_complete")) {
-            return StartZiplineHop(ctx, ctx.session->currentWaypoint(), 0.0);
+            return StartZiplineHop(ctx, CurrentWaypoint(*ctx.session), 0.0);
         }
         LeaveZiplineTower(ctx);
     }
@@ -294,9 +294,9 @@ Result AdvanceMountSpot(const Context& ctx, const Waypoint& waypoint, const char
     approach.spot_index = cursor + 1;
     approach.press_missed = true;
     const ZiplineMountSpot& spot = plan.mount_spots[approach.spot_index];
-    const bool retargeted = ctx.session->retargetCurrentWaypoint(spot.x, spot.y, reason);
+    const bool retargeted = RetargetCurrentWaypoint(ctx.session, spot.x, spot.y, reason);
     // 硬时钟不归零的话, 下一拍就会把剩下的站位一口气烧光
-    ctx.session->resetHardProgress();
+    ResetHardProgress(ctx.session);
     LogWarn << "Action: ZIPLINE no mount prompt here; walking to the next stand point." << VAR(reason) << VAR(retargeted)
             << VAR(approach.spot_index) << VAR(spot_count) << VAR(spot.x) << VAR(spot.y);
     ctx.runtime_state->route = {};
@@ -316,8 +316,8 @@ bool SkipToHopUnderfoot(const Context& ctx, const char* reason)
     if (!underfoot) {
         return false;
     }
-    const std::vector<Waypoint>& path = ctx.session->currentPath();
-    const size_t current = ctx.session->currentNodeIdx();
+    const std::vector<Waypoint>& path = ctx.session->current_path;
+    const size_t current = ctx.session->current_node_idx;
     const size_t hop = skip_continuous_run(path, current);
     if (hop >= path.size() || path[hop].action != ActionType::ZIPLINE || !path[hop].zipline_hop
         || !path[hop].zipline_hop->mount.sameTower(*underfoot)) {
@@ -326,7 +326,7 @@ bool SkipToHopUnderfoot(const Context& ctx, const char* reason)
     if (hop > current) {
         LogInfo << "Next hop leaves from the tower underfoot; skipping the walk to its stand point." << VAR(reason) << VAR(current)
                 << VAR(hop) << VAR(underfoot->x) << VAR(underfoot->y);
-        ctx.session->skipPastWaypoint(hop - 1, reason);
+        SkipPastWaypoint(ctx.session, hop - 1, reason);
     }
     return true;
 }
@@ -386,7 +386,7 @@ Result StartZiplineHop(const Context& ctx, const Waypoint& waypoint, double actu
     LogInfo << "Action: ZIPLINE hop started." << VAR(waypoint.zipline_hop->landing.x) << VAR(waypoint.zipline_hop->landing.y)
             << VAR(waypoint.zipline_hop->planned_elevation_deg) << VAR(waypoint.zipline_hop->chain_continues) << VAR(actual_distance);
     // 航点等落地再推进, 起滑时人还在上索点, 链尾也不能在这里收工
-    ctx.session->updatePhase(NaviPhase::WaitZipline, "zipline_hop_started");
+    UpdatePhase(ctx.session, NaviPhase::WaitZipline, "zipline_hop_started");
     result.consumed = true;
     result.stay_in_current_tick = true;
     return result;
@@ -419,7 +419,7 @@ Result TickZiplineRide(const Context& ctx)
             replan->still_on_tower);
     }
     if (std::get_if<NeedsReposition>(&outcome) != nullptr) {
-        return AdvanceMountSpot(ctx, ctx.session->currentWaypoint(), "zipline_mount_unmounted");
+        return AdvanceMountSpot(ctx, CurrentWaypoint(*ctx.session), "zipline_mount_unmounted");
     }
     result.stay_in_current_tick = true;
     SleepFor(kZiplineRideRetryIntervalMs);

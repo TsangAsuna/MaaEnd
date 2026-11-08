@@ -39,7 +39,7 @@ bool inside_push_through_disc(const std::vector<VirtualNoGoDisc>& discs, const N
 TickStep NavigationStateMachine::checkOffRouteWedge(const NavigateTick& tick)
 {
     const RouteMeasurement& route = tick.route;
-    const bool watched = session_->phase() == NaviPhase::Navigate && IsContinuousRun(tick.waypoint) && !route.on_route
+    const bool watched = session_->phase == NaviPhase::Navigate && IsContinuousRun(tick.waypoint) && !route.on_route
                          && std::isfinite(route.cross_track) && !runtime_state_.cross_tier_escape.active;
     if (!watched) {
         runtime_state_.offroute = {};
@@ -62,7 +62,7 @@ TickStep NavigationStateMachine::checkOffRouteWedge(const NavigateTick& tick)
     case WedgeAction::Replan: {
         const int64_t wedge_ms = ElapsedMs(runtime_state_.offroute.since, tick.now);
         LogWarn << "Off-route wedge detected; replanning from current position." << VAR(wedge_ms) << VAR(route.waypoint_distance)
-                << VAR(route.cross_track) << VAR_AS(session_->current_node_idx(), session_->currentNodeIdx());
+                << VAR(route.cross_track) << VAR_AS(session_->current_node_idx(), session_->current_node_idx);
         handleDynamicReplanRequest("offroute_wedge");
         return TickStep::EndTick;
     }
@@ -78,7 +78,7 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
     const bool pinned_without_own_fallback = forward_hold_futile && tick.stalled_ms >= kObstacleRecoveryMinTriggerMs
                                              && !StopsOnPromptDetection(waypoint) && waypoint.action != ActionType::ZIPLINE;
     const bool far_or_strict = tick.effective_progress > kNoProgressMinDistance || RequiresStrictArrival(waypoint);
-    const bool should_try_recovery = session_->phase() == NaviPhase::Navigate
+    const bool should_try_recovery = session_->phase == NaviPhase::Navigate
                                      && (tick.stalled_ms >= kObstacleRecoveryMinTriggerMs || forward_hold_futile)
                                      && (far_or_strict || pinned_without_own_fallback) && !runtime_state_.cross_tier_escape.active;
     if (!should_try_recovery) {
@@ -102,7 +102,7 @@ TickStep NavigationStateMachine::runObstacleRecovery(const NavigateTick& tick)
     }
 
     // 用硬进度时钟计时, 每次小脱困都会重置 recovery.started_at
-    const int64_t recovery_elapsed_ms = session_->hardStalledMs(tick.now);
+    const int64_t recovery_elapsed_ms = HardStalledMs(*session_, tick.now);
     if (recovery_elapsed_ms > kDynamicRecoveryTotalTimeoutMs) {
         if (waypoint.action == ActionType::ZIPLINE) {
             LogWarn << "Recovery timed out at a zipline tower; dropping the chain and walking." << VAR(recovery_elapsed_ms)
@@ -154,8 +154,8 @@ bool NavigationStateMachine::climbRecoveryLadder(const NavigateTick& tick, bool 
         if (!returnToWorld()) {
             return true;
         }
-        session_->excludeFromStallClocks(std::chrono::steady_clock::now() - cleanup_started_at);
-        session_->updateCurrentZone(position_->zone_id);
+        ExcludeFromStallClocks(session_, std::chrono::steady_clock::now() - cleanup_started_at);
+        UpdateCurrentZone(session_, position_->zone_id);
     }
 
     ++escalation.jump_attempt_count;
@@ -283,14 +283,14 @@ bool NavigationStateMachine::executePhysicalUnstick(double stuck_heading)
         (anchor && tryVirtualNoGoReplan("recovery_unstick_replan", anchor->first, anchor->second, step_start, stuck_heading))
         || tryApplyDynamicOverlayToNextAnchor("recovery_unstick_replan");
     if (replanned) {
-        session_->resetProgress();
+        ResetProgress(session_);
         selectPhaseForCurrentWaypoint("recovery_unstick_replan");
         return true;
     }
     ResetRouteTracking(&runtime_state_.route);
     runtime_state_.dynamic_replan_requested = false;
     runtime_state_.nav_run_dirty = true;
-    session_->resetProgress();
+    ResetProgress(session_);
     selectPhaseForCurrentWaypoint("recovery_physical_unstick");
     return true;
 }

@@ -16,7 +16,7 @@ namespace mapnavigator
 {
 
 struct NaviParam;
-struct NavigationSession;
+struct Session;
 struct NavigationRuntimeState;
 struct RouteMeasurement;
 
@@ -85,7 +85,7 @@ class NavRunController
 public:
     // halt 在同步规划前调用, 用来松开前进键
     NavRunTickResult tick(
-        NavigationSession* session,
+        Session* session,
         NavigationRuntimeState* runtime,
         const NaviPosition& position,
         const RouteMeasurement& route,
@@ -100,7 +100,7 @@ public:
 private:
     struct TickInput
     {
-        NavigationSession& session;
+        Session& session;
         const NavigationRuntimeState& runtime;
         const NaviPosition& position;
         const RouteMeasurement& route;
