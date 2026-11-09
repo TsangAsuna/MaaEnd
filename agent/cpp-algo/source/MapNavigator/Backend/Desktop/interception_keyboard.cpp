@@ -6,10 +6,10 @@
 // 调用方（desktop_input_backend）据此自然回退到 MaaController 路径。
 #ifdef _WIN32
 
-// winsock2.h 必须先于 windows.h：windows.h 会拉入旧版 winsock.h，
-// 与 MaaUtils 依赖链里的 winsock2.h 产生 struct 重定义冲突。
-#include <winsock2.h>
-#include <windows.h>
+// 用项目统一的 Windows 头封装：它先定义 WIN32_LEAN_AND_MEAN / NOMINMAX 再包含
+// winsock2.h（必须先于 windows.h，否则 windows.h 会拉入旧版 winsock.h 与
+// MaaUtils 依赖链里的 winsock2.h 产生 struct 重定义冲突），并补上 shellapi.h。
+#include <MaaUtils/SafeWindows.hpp>
 
 #include <cstring>
 

@@ -8,6 +8,7 @@
 #include "../../navi_time.h"
 #include "../backend.h"
 #include "desktop_input_backend.h"
+#include "interception_keyboard.h"
 
 namespace mapnavigator::backend::desktop
 {
